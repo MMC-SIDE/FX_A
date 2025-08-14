@@ -1,0 +1,169 @@
+# Grafana データソース設定
+# Prometheus データソース自動プロビジョニング
+
+apiVersion: 1
+
+# データソース削除リスト
+deleteDatasources:
+  - name: Prometheus
+    orgId: 1
+
+# データソース追加リスト
+datasources:
+  # Prometheusメインデータソース
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    orgId: 1
+    url: http://prometheus:9090
+    isDefault: true
+    version: 1
+    editable: true
+    jsonData:
+      httpMethod: POST
+      manageAlerts: true
+      prometheusType: Prometheus
+      prometheusVersion: 2.40.0
+      cacheLevel: 'High'
+      disableMetricsLookup: false
+      customQueryParameters: ''
+      timeInterval: '30s'
+      queryTimeout: '60s'
+      defaultRegion: 'default'
+      tlsAuth: false
+      tlsAuthWithCACert: false
+      tlsSkipVerify: false
+      exemplarTraceIdDestinations:
+        - name: trace_id
+          datasourceUid: jaeger_uid
+
+  # AlertManager データソース
+  - name: AlertManager
+    type: alertmanager
+    access: proxy
+    orgId: 1
+    url: http://alertmanager:9093
+    isDefault: false
+    version: 1
+    editable: true
+    jsonData:
+      implementation: prometheus
+      handleGrafanaManagedAlerts: false
+
+  # PostgreSQL データソース（直接クエリ用）
+  - name: PostgreSQL
+    type: postgres
+    access: proxy
+    orgId: 1
+    url: postgres:5432
+    database: fx_trading
+    user: fx_user
+    isDefault: false
+    version: 1
+    editable: true
+    secureJsonData:
+      password: ${DB_PASSWORD}
+    jsonData:
+      database: fx_trading
+      sslmode: disable
+      maxOpenConns: 5
+      maxIdleConns: 2
+      connMaxLifetime: 14400
+      postgresVersion: 1400
+      timescaledb: true
+
+  # TimescaleDB 専用データソース
+  - name: TimescaleDB
+    type: postgres
+    access: proxy
+    orgId: 1
+    url: postgres:5432
+    database: fx_trading
+    user: fx_user
+    isDefault: false
+    version: 1
+    editable: true
+    secureJsonData:
+      password: ${DB_PASSWORD}
+    jsonData:
+      database: fx_trading
+      sslmode: disable
+      maxOpenConns: 10
+      maxIdleConns: 5
+      connMaxLifetime: 14400
+      postgresVersion: 1400
+      timescaledb: true
+      timeColumn: time
+      metricColumn: symbol
+
+  # Redis データソース（Redis データソースプラグイン使用）
+  - name: Redis
+    type: redis-datasource
+    access: proxy
+    orgId: 1
+    url: redis://redis:6379
+    isDefault: false
+    version: 1
+    editable: true
+    secureJsonData:
+      password: ${REDIS_PASSWORD}
+    jsonData:
+      client: standalone
+      poolSize: 5
+      timeout: 10
+      pingInterval: 0
+      pipelineWindow: 0
+
+  # Loki データソース（ログ用、オプション）
+  - name: Loki
+    type: loki
+    access: proxy
+    orgId: 1
+    url: http://loki:3100
+    isDefault: false
+    version: 1
+    editable: true
+    jsonData:
+      timeout: 60
+      maxLines: 1000
+      manageAlerts: false
+      alertmanagerUid: alertmanager_uid
+
+  # Jaeger データソース（トレーシング用、オプション）
+  - name: Jaeger
+    type: jaeger
+    access: proxy
+    orgId: 1
+    url: http://jaeger:14268
+    isDefault: false
+    version: 1
+    editable: true
+    uid: jaeger_uid
+    jsonData:
+      tracesToLogs:
+        datasourceUid: loki_uid
+        tags: ['job', 'instance', 'pod', 'namespace']
+        mappedTags: [{ key: 'service.name', value: 'service' }]
+        mapTagNamesEnabled: false
+        spanStartTimeShift: '-1h'
+        spanEndTimeShift: '1h'
+        filterByTraceID: false
+        filterBySpanID: false
+      tracesToMetrics:
+        datasourceUid: prometheus_uid
+        tags: [{ key: 'service.name', value: 'service' }, { key: 'job' }]
+        queries:
+          - name: 'Sample query'
+            query: 'sum(rate(traces_spanmetrics_latency_bucket{$$__tags}[5m]))'
+      nodeGraph:
+        enabled: true
+
+  # TestData データソース（テスト用）
+  - name: TestData
+    type: testdata
+    access: proxy
+    orgId: 1
+    isDefault: false
+    version: 1
+    editable: true
+    jsonData: {}

@@ -1,0 +1,278 @@
+# AlertManager設定ファイル
+# FX Trading System アラート管理設定
+
+global:
+  # SMTP設定（メール通知用）
+  smtp_smarthost: '${EMAIL_SMTP_HOST}:${EMAIL_SMTP_PORT}'
+  smtp_from: '${EMAIL_FROM}'
+  smtp_auth_username: '${EMAIL_USERNAME}'
+  smtp_auth_password: '${EMAIL_PASSWORD}'
+  smtp_require_tls: true
+
+# アラート重複排除設定
+route:
+  # デフォルトレシーバー
+  receiver: 'default-receiver'
+  
+  # グループ化設定
+  group_by: ['alertname', 'cluster', 'service']
+  group_wait: 10s
+  group_interval: 10s
+  repeat_interval: 1h
+  
+  # ルーティングルール
+  routes:
+    # 重要度 critical のアラート
+    - match:
+        severity: critical
+      receiver: 'critical-alerts'
+      group_wait: 0s
+      group_interval: 5s
+      repeat_interval: 5m
+      continue: true
+
+    # 取引システム関連のアラート
+    - match:
+        component: trading
+      receiver: 'trading-alerts'
+      group_wait: 5s
+      repeat_interval: 15m
+      continue: true
+
+    # データベース関連のアラート
+    - match:
+        component: database
+      receiver: 'database-alerts'
+      group_wait: 30s
+      repeat_interval: 30m
+
+    # セキュリティ関連のアラート
+    - match:
+        component: security
+      receiver: 'security-alerts'
+      group_wait: 0s
+      repeat_interval: 10m
+
+    # システム関連のアラート
+    - match:
+        component: system
+      receiver: 'system-alerts'
+      group_wait: 2m
+      repeat_interval: 1h
+
+    # 機械学習関連のアラート
+    - match:
+        component: ml
+      receiver: 'ml-alerts'
+      group_wait: 5m
+      repeat_interval: 2h
+
+    # バックアップ関連のアラート
+    - match:
+        component: backup
+      receiver: 'backup-alerts'
+      group_wait: 0s
+      repeat_interval: 6h
+
+# アラート受信者設定
+receivers:
+  # デフォルト受信者
+  - name: 'default-receiver'
+    email_configs:
+      - to: '${EMAIL_TO}'
+        subject: '[FX Trading] 一般アラート: {{ .GroupLabels.alertname }}'
+        body: |
+          システムアラートが発生しました。
+
+          詳細:
+          {{ range .Alerts }}
+          - アラート: {{ .Annotations.summary }}
+          - 説明: {{ .Annotations.description }}
+          - 重要度: {{ .Labels.severity }}
+          - 時刻: {{ .StartsAt.Format "2006-01-02 15:04:05 JST" }}
+          {{ end }}
+
+          確認URL: {{ .ExternalURL }}
+
+  # 重要アラート受信者
+  - name: 'critical-alerts'
+    email_configs:
+      - to: '${EMAIL_TO}'
+        subject: '🚨 [FX Trading] 緊急アラート: {{ .GroupLabels.alertname }}'
+        body: |
+          ⚠️ 緊急事態が発生しました ⚠️
+
+          {{ range .Alerts }}
+          アラート: {{ .Annotations.summary }}
+          説明: {{ .Annotations.description }}
+          発生時刻: {{ .StartsAt.Format "2006-01-02 15:04:05 JST" }}
+          {{ end }}
+
+          すぐに対応してください。
+          確認URL: {{ .ExternalURL }}
+    
+    slack_configs:
+      - api_url: '${SLACK_WEBHOOK_URL}'
+        channel: '#fx-trading-alerts'
+        title: '🚨 緊急アラート'
+        text: |
+          {{ range .Alerts }}
+          *{{ .Annotations.summary }}*
+          {{ .Annotations.description }}
+          {{ end }}
+        color: danger
+    
+    webhook_configs:
+      - url: '${DISCORD_WEBHOOK_URL}'
+        send_resolved: true
+
+  # 取引システムアラート受信者
+  - name: 'trading-alerts'
+    email_configs:
+      - to: '${EMAIL_TO}'
+        subject: '[FX Trading] 取引システムアラート: {{ .GroupLabels.alertname }}'
+        body: |
+          取引システムでアラートが発生しました。
+
+          {{ range .Alerts }}
+          - アラート: {{ .Annotations.summary }}
+          - 説明: {{ .Annotations.description }}
+          - 重要度: {{ .Labels.severity }}
+          - 時刻: {{ .StartsAt.Format "2006-01-02 15:04:05 JST" }}
+          {{ end }}
+
+          取引の停止を検討してください。
+    
+    slack_configs:
+      - api_url: '${SLACK_WEBHOOK_URL}'
+        channel: '#fx-trading-alerts'
+        title: '💰 取引システムアラート'
+        text: |
+          {{ range .Alerts }}
+          {{ .Annotations.summary }}
+          {{ .Annotations.description }}
+          {{ end }}
+        color: warning
+
+  # データベースアラート受信者
+  - name: 'database-alerts'
+    email_configs:
+      - to: '${EMAIL_TO}'
+        subject: '[FX Trading] データベースアラート: {{ .GroupLabels.alertname }}'
+        body: |
+          データベースでアラートが発生しました。
+
+          {{ range .Alerts }}
+          - アラート: {{ .Annotations.summary }}
+          - 説明: {{ .Annotations.description }}
+          - 重要度: {{ .Labels.severity }}
+          - 時刻: {{ .StartsAt.Format "2006-01-02 15:04:05 JST" }}
+          {{ end }}
+
+          データベースの状態を確認してください。
+
+  # セキュリティアラート受信者
+  - name: 'security-alerts'
+    email_configs:
+      - to: '${EMAIL_TO}'
+        subject: '🔒 [FX Trading] セキュリティアラート: {{ .GroupLabels.alertname }}'
+        body: |
+          セキュリティ関連のアラートが発生しました。
+
+          {{ range .Alerts }}
+          - アラート: {{ .Annotations.summary }}
+          - 説明: {{ .Annotations.description }}
+          - 重要度: {{ .Labels.severity }}
+          - 時刻: {{ .StartsAt.Format "2006-01-02 15:04:05 JST" }}
+          {{ end }}
+
+          セキュリティ状況を確認してください。
+    
+    slack_configs:
+      - api_url: '${SLACK_WEBHOOK_URL}'
+        channel: '#fx-trading-security'
+        title: '🔒 セキュリティアラート'
+        text: |
+          {{ range .Alerts }}
+          {{ .Annotations.summary }}
+          {{ .Annotations.description }}
+          {{ end }}
+        color: danger
+
+  # システムアラート受信者
+  - name: 'system-alerts'
+    email_configs:
+      - to: '${EMAIL_TO}'
+        subject: '[FX Trading] システムアラート: {{ .GroupLabels.alertname }}'
+        body: |
+          システムリソースでアラートが発生しました。
+
+          {{ range .Alerts }}
+          - アラート: {{ .Annotations.summary }}
+          - 説明: {{ .Annotations.description }}
+          - 重要度: {{ .Labels.severity }}
+          - 時刻: {{ .StartsAt.Format "2006-01-02 15:04:05 JST" }}
+          {{ end }}
+
+          システムリソースを確認してください。
+
+  # 機械学習アラート受信者
+  - name: 'ml-alerts'
+    email_configs:
+      - to: '${EMAIL_TO}'
+        subject: '[FX Trading] MLアラート: {{ .GroupLabels.alertname }}'
+        body: |
+          機械学習システムでアラートが発生しました。
+
+          {{ range .Alerts }}
+          - アラート: {{ .Annotations.summary }}
+          - 説明: {{ .Annotations.description }}
+          - 重要度: {{ .Labels.severity }}
+          - 時刻: {{ .StartsAt.Format "2006-01-02 15:04:05 JST" }}
+          {{ end }}
+
+          モデルの再学習を検討してください。
+
+  # バックアップアラート受信者
+  - name: 'backup-alerts'
+    email_configs:
+      - to: '${EMAIL_TO}'
+        subject: '[FX Trading] バックアップアラート: {{ .GroupLabels.alertname }}'
+        body: |
+          バックアップシステムでアラートが発生しました。
+
+          {{ range .Alerts }}
+          - アラート: {{ .Annotations.summary }}
+          - 説明: {{ .Annotations.description }}
+          - 重要度: {{ .Labels.severity }}
+          - 時刻: {{ .StartsAt.Format "2006-01-02 15:04:05 JST" }}
+          {{ end }}
+
+          バックアップ状況を確認してください。
+
+# アラート抑制設定
+inhibit_rules:
+  # 重要度が高いアラートが発生している場合、同じ対象の低い重要度のアラートを抑制
+  - source_match:
+      severity: 'critical'
+    target_match:
+      severity: 'warning'
+    equal: ['alertname', 'instance']
+
+  # システム停止時は他のアラートを抑制
+  - source_match:
+      alertname: 'InstanceDown'
+    target_match_re:
+      severity: '.*'
+    equal: ['instance']
+
+  # データベース停止時は関連アラートを抑制
+  - source_match:
+      alertname: 'PostgreSQLDown'
+    target_match_re:
+      component: 'database'
+    equal: ['instance']
+
+# テンプレート設定
+templates:
+  - '/etc/alertmanager/templates/*.tmpl'

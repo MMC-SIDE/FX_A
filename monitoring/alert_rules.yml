@@ -1,0 +1,287 @@
+# Prometheus Alert Rules
+# FX Trading System アラートルール設定
+
+groups:
+  # システムレベルアラート
+  - name: system.rules
+    rules:
+      # ディスク容量アラート
+      - alert: HighDiskUsage
+        expr: (node_filesystem_avail_bytes / node_filesystem_size_bytes) * 100 < 15
+        for: 5m
+        labels:
+          severity: warning
+          component: system
+        annotations:
+          summary: "ディスク容量が不足しています"
+          description: "{{ $labels.instance }} のディスク使用量が85%を超えています (現在: {{ $value }}%)"
+
+      - alert: CriticalDiskUsage
+        expr: (node_filesystem_avail_bytes / node_filesystem_size_bytes) * 100 < 5
+        for: 2m
+        labels:
+          severity: critical
+          component: system
+        annotations:
+          summary: "ディスク容量が危険レベルです"
+          description: "{{ $labels.instance }} のディスク使用量が95%を超えています (現在: {{ $value }}%)"
+
+      # メモリ使用量アラート
+      - alert: HighMemoryUsage
+        expr: (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes * 100 > 85
+        for: 10m
+        labels:
+          severity: warning
+          component: system
+        annotations:
+          summary: "メモリ使用量が高すぎます"
+          description: "{{ $labels.instance }} のメモリ使用量が85%を超えています (現在: {{ $value }}%)"
+
+      # CPU使用量アラート
+      - alert: HighCPUUsage
+        expr: 100 - (avg by(instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+        for: 15m
+        labels:
+          severity: warning
+          component: system
+        annotations:
+          summary: "CPU使用量が高すぎます"
+          description: "{{ $labels.instance }} のCPU使用量が80%を超えています (現在: {{ $value }}%)"
+
+  # データベース関連アラート
+  - name: database.rules
+    rules:
+      # PostgreSQL接続数アラート
+      - alert: PostgreSQLHighConnections
+        expr: pg_stat_database_numbackends / pg_settings_max_connections * 100 > 80
+        for: 5m
+        labels:
+          severity: warning
+          component: database
+        annotations:
+          summary: "PostgreSQL接続数が多すぎます"
+          description: "データベース接続数が最大値の80%を超えています (現在: {{ $value }}%)"
+
+      # データベースサイズアラート
+      - alert: DatabaseSizeGrowth
+        expr: increase(pg_database_size_bytes[1h]) > 1073741824  # 1GB
+        for: 0m
+        labels:
+          severity: info
+          component: database
+        annotations:
+          summary: "データベースサイズが急速に増加しています"
+          description: "過去1時間でデータベースサイズが1GB以上増加しました"
+
+      # レプリケーション遅延アラート
+      - alert: PostgreSQLReplicationLag
+        expr: pg_replication_lag_seconds > 300
+        for: 5m
+        labels:
+          severity: warning
+          component: database
+        annotations:
+          summary: "PostgreSQLレプリケーション遅延"
+          description: "レプリケーション遅延が5分を超えています (現在: {{ $value }}秒)"
+
+  # FX取引システム特有アラート
+  - name: trading.rules
+    rules:
+      # 取引エラー率アラート
+      - alert: HighTradingErrorRate
+        expr: rate(fx_trading_errors_total[5m]) > 0.1
+        for: 2m
+        labels:
+          severity: critical
+          component: trading
+        annotations:
+          summary: "取引エラー率が高すぎます"
+          description: "取引エラー率が毎分0.1を超えています (現在: {{ $value }})"
+
+      # MT5接続失敗アラート
+      - alert: MT5ConnectionFailure
+        expr: fx_mt5_connection_status == 0
+        for: 1m
+        labels:
+          severity: critical
+          component: trading
+        annotations:
+          summary: "MT5接続が切断されました"
+          description: "MT5サーバーとの接続が失敗しています"
+
+      # ポジション数異常アラート
+      - alert: UnusualPositionCount
+        expr: fx_active_positions_count > 50
+        for: 5m
+        labels:
+          severity: warning
+          component: trading
+        annotations:
+          summary: "アクティブポジション数が異常です"
+          description: "アクティブポジション数が50を超えています (現在: {{ $value }})"
+
+      # ドローダウンアラート
+      - alert: HighDrawdown
+        expr: fx_current_drawdown_percent > 15
+        for: 1m
+        labels:
+          severity: critical
+          component: trading
+        annotations:
+          summary: "ドローダウンが危険レベルです"
+          description: "現在のドローダウンが15%を超えています (現在: {{ $value }}%)"
+
+      # 損失アラート
+      - alert: DailyLossLimit
+        expr: fx_daily_pnl < -10000
+        for: 0m
+        labels:
+          severity: critical
+          component: trading
+        annotations:
+          summary: "日次損失限度額に到達しました"
+          description: "本日の損失が10,000円を超えています (現在: {{ $value }}円)"
+
+  # アプリケーション関連アラート
+  - name: application.rules
+    rules:
+      # APIレスポンス時間アラート
+      - alert: HighAPIResponseTime
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 2
+        for: 10m
+        labels:
+          severity: warning
+          component: api
+        annotations:
+          summary: "API応答時間が遅すぎます"
+          description: "95パーセンタイルのAPI応答時間が2秒を超えています"
+
+      # HTTPエラー率アラート
+      - alert: HighHTTPErrorRate
+        expr: rate(http_requests_total{status=~"5.."}[5m]) / rate(http_requests_total[5m]) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+          component: api
+        annotations:
+          summary: "HTTPエラー率が高すぎます"
+          description: "5分間のHTTPエラー率が5%を超えています (現在: {{ $value }}%)"
+
+      # Celeryキュー滞留アラート
+      - alert: CeleryQueueBacklog
+        expr: celery_queue_length > 100
+        for: 5m
+        labels:
+          severity: warning
+          component: celery
+        annotations:
+          summary: "Celeryキューに滞留があります"
+          description: "Celeryキューの長さが100を超えています (現在: {{ $value }})"
+
+      # Redis接続アラート
+      - alert: RedisConnectionFailure
+        expr: redis_up == 0
+        for: 1m
+        labels:
+          severity: critical
+          component: redis
+        annotations:
+          summary: "Redis接続が失敗しています"
+          description: "Redisサーバーに接続できません"
+
+  # 機械学習モデル関連アラート
+  - name: ml.rules
+    rules:
+      # モデル予測精度アラート
+      - alert: LowModelAccuracy
+        expr: fx_ml_model_accuracy < 0.6
+        for: 10m
+        labels:
+          severity: warning
+          component: ml
+        annotations:
+          summary: "機械学習モデルの精度が低下しています"
+          description: "モデル精度が60%を下回っています (現在: {{ $value }})"
+
+      # モデル予測時間アラート
+      - alert: SlowModelPrediction
+        expr: fx_ml_prediction_duration_seconds > 5
+        for: 5m
+        labels:
+          severity: warning
+          component: ml
+        annotations:
+          summary: "モデル予測時間が長すぎます"
+          description: "予測時間が5秒を超えています (現在: {{ $value }}秒)"
+
+      # データ取得失敗アラート
+      - alert: DataFetchFailure
+        expr: rate(fx_data_fetch_errors_total[5m]) > 0.1
+        for: 3m
+        labels:
+          severity: warning
+          component: data
+        annotations:
+          summary: "データ取得エラーが多発しています"
+          description: "データ取得エラー率が毎分0.1を超えています"
+
+  # セキュリティ関連アラート
+  - name: security.rules
+    rules:
+      # 異常なアクセス頻度アラート
+      - alert: UnusualAccessRate
+        expr: rate(nginx_http_requests_total[1m]) > 100
+        for: 2m
+        labels:
+          severity: warning
+          component: security
+        annotations:
+          summary: "異常なアクセス頻度が検出されました"
+          description: "1分間のアクセス数が100を超えています (現在: {{ $value }})"
+
+      # 認証失敗アラート
+      - alert: HighAuthFailureRate
+        expr: rate(fx_auth_failures_total[5m]) > 0.2
+        for: 3m
+        labels:
+          severity: warning
+          component: security
+        annotations:
+          summary: "認証失敗率が高すぎます"
+          description: "認証失敗率が毎分0.2を超えています"
+
+      # SSL証明書期限アラート
+      - alert: SSLCertificateExpiry
+        expr: probe_ssl_earliest_cert_expiry - time() < 2592000  # 30日
+        for: 0m
+        labels:
+          severity: warning
+          component: security
+        annotations:
+          summary: "SSL証明書の有効期限が近づいています"
+          description: "SSL証明書の有効期限まで30日を切りました"
+
+  # バックアップ関連アラート
+  - name: backup.rules
+    rules:
+      # バックアップ失敗アラート
+      - alert: BackupFailure
+        expr: fx_backup_success == 0
+        for: 0m
+        labels:
+          severity: critical
+          component: backup
+        annotations:
+          summary: "データベースバックアップが失敗しました"
+          description: "最新のバックアップが失敗しています。すぐに確認してください。"
+
+      # バックアップサイズ異常アラート
+      - alert: UnusualBackupSize
+        expr: abs(fx_backup_size_bytes - fx_backup_size_bytes offset 24h) / fx_backup_size_bytes offset 24h > 0.5
+        for: 0m
+        labels:
+          severity: warning
+          component: backup
+        annotations:
+          summary: "バックアップサイズが異常です"
+          description: "バックアップサイズが前日と比べて50%以上変化しています"

@@ -1,0 +1,112 @@
+# FX Trading System - Cron ジョブ設定
+# 本番環境用の定期実行タスク
+
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
+
+# 環境変数
+MAILTO=""
+LOG_DIR="/var/log/cron"
+
+# ======================
+# データベースバックアップ
+# ======================
+
+# 毎日午前2時にデータベースバックアップを実行
+0 2 * * * /app/scripts/backup_database.sh >> /var/log/cron/backup.log 2>&1
+
+# 週次バックアップ（日曜日午前3時）- より詳細なバックアップ
+0 3 * * 0 /app/scripts/backup_database.sh --full >> /var/log/cron/backup_weekly.log 2>&1
+
+# ======================
+# ログローテーション
+# ======================
+
+# 毎日午前1時にログローテーションを実行
+0 1 * * * /usr/sbin/logrotate /etc/logrotate.d/fx_trading >> /var/log/cron/logrotate.log 2>&1
+
+# ======================
+# システム監視・ヘルスチェック
+# ======================
+
+# 5分毎にシステムヘルスチェックを実行
+*/5 * * * * /app/scripts/health_check.sh >> /var/log/cron/health.log 2>&1
+
+# 30分毎にディスク使用量チェック
+*/30 * * * * /app/scripts/disk_check.sh >> /var/log/cron/disk.log 2>&1
+
+# ======================
+# データベースメンテナンス
+# ======================
+
+# 毎日午前4時にデータベース統計情報を更新
+0 4 * * * /app/scripts/db_maintenance.sh >> /var/log/cron/db_maintenance.log 2>&1
+
+# 週次でVACUUM ANALYZE実行（日曜日午前5時）
+0 5 * * 0 /app/scripts/db_vacuum.sh >> /var/log/cron/db_vacuum.log 2>&1
+
+# ======================
+# TimescaleDB最適化
+# ======================
+
+# 毎時TimescaleDBの圧縮ジョブ確認
+0 * * * * /app/scripts/timescale_compression_check.sh >> /var/log/cron/timescale.log 2>&1
+
+# 月次でTimescaleDBのメンテナンス（第1日曜日午前6時）
+0 6 1-7 * 0 /app/scripts/timescale_maintenance.sh >> /var/log/cron/timescale_monthly.log 2>&1
+
+# ======================
+# セキュリティ
+# ======================
+
+# 毎日午前12時にセキュリティログの確認
+0 0 * * * /app/scripts/security_audit.sh >> /var/log/cron/security.log 2>&1
+
+# 週次でSSL証明書の有効期限チェック（月曜日午前9時）
+0 9 * * 1 /app/scripts/ssl_check.sh >> /var/log/cron/ssl.log 2>&1
+
+# ======================
+# モニタリング・アラート
+# ======================
+
+# 15分毎にシステムメトリクスの異常値チェック
+*/15 * * * * /app/scripts/metrics_alert.sh >> /var/log/cron/metrics.log 2>&1
+
+# 毎時Prometheusルールの評価
+0 * * * * /app/scripts/prometheus_check.sh >> /var/log/cron/prometheus.log 2>&1
+
+# ======================
+# データクリーンアップ
+# ======================
+
+# 毎日午前3時30分に古いログファイルをクリーンアップ
+30 3 * * * find /var/log -name "*.log" -mtime +30 -delete >> /var/log/cron/cleanup.log 2>&1
+
+# 週次で一時ファイルのクリーンアップ（火曜日午前4時）
+0 4 * * 2 find /tmp -type f -mtime +7 -delete >> /var/log/cron/cleanup.log 2>&1
+
+# 月次でDockerイメージのクリーンアップ（第1土曜日午前7時）
+0 7 1-7 * 6 docker system prune -f >> /var/log/cron/docker_cleanup.log 2>&1
+
+# ======================
+# レポート生成
+# ======================
+
+# 毎日午前8時に日次レポート生成
+0 8 * * * /app/scripts/generate_daily_report.sh >> /var/log/cron/reports.log 2>&1
+
+# 週次レポート生成（月曜日午前8時30分）
+30 8 * * 1 /app/scripts/generate_weekly_report.sh >> /var/log/cron/reports.log 2>&1
+
+# 月次レポート生成（月初第1日午前9時）
+0 9 1 * * /app/scripts/generate_monthly_report.sh >> /var/log/cron/reports.log 2>&1
+
+# ======================
+# 自動更新・デプロイ
+# ======================
+
+# 毎日午前11時にシステムの自動更新チェック（本番環境では慎重に）
+0 11 * * * /app/scripts/update_check.sh >> /var/log/cron/updates.log 2>&1
+
+# 週次でコンテナイメージの更新チェック（水曜日午前10時）
+0 10 * * 3 /app/scripts/container_update_check.sh >> /var/log/cron/container_updates.log 2>&1

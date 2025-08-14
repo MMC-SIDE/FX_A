@@ -1,0 +1,7 @@
+{
+  "login": 12345678,
+  "password": "your_password",
+  "server": "XMTrading-MT5",
+  "path": "C:\\Program Files\\MetaTrader 5\\terminal64.exe",
+  "timeout": 60000
+}

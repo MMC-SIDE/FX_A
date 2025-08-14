@@ -1,0 +1,60 @@
+# Grafana ダッシュボード設定
+# ダッシュボードの自動プロビジョニング設定
+
+apiVersion: 1
+
+providers:
+  # FX Trading System メインダッシュボード
+  - name: 'fx-trading-dashboards'
+    orgId: 1
+    folder: 'FX Trading System'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 10
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards/fx-trading
+
+  # システム監視ダッシュボード
+  - name: 'system-monitoring'
+    orgId: 1
+    folder: 'System Monitoring'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 10
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards/system
+
+  # データベース監視ダッシュボード
+  - name: 'database-monitoring'
+    orgId: 1
+    folder: 'Database Monitoring'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 10
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards/database
+
+  # セキュリティ監視ダッシュボード
+  - name: 'security-monitoring'
+    orgId: 1
+    folder: 'Security Monitoring'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 10
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards/security
+
+  # ビジネスメトリクスダッシュボード
+  - name: 'business-metrics'
+    orgId: 1
+    folder: 'Business Metrics'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 10
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards/business
