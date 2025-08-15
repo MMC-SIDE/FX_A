@@ -6,6 +6,7 @@ from typing import Dict, List, Optional, Any
 import logging
 from datetime import datetime, timedelta
 import asyncio
+import pandas as pd
 
 from backend.core.database import DatabaseManager
 from backend.backtest.backtest_engine import BacktestEngine

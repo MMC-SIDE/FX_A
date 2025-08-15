@@ -11,8 +11,8 @@ from sqlalchemy.orm import Session
 from sqlalchemy import desc, and_, or_
 
 from ..websocket.websocket_manager import WebSocketManager
-from ..core.database import get_db
-from ..models.backtest_models import Trade, Position
+# from ..core.database import get_db
+# from ..models.backtest_models import Trade, Position
 
 logger = logging.getLogger(__name__)
 

@@ -173,15 +173,24 @@ class BacktestEngine:
             model = LightGBMPredictor()
             
             # パラメータ設定
-            model_params = {
-                'n_estimators': parameters.get('n_estimators', 100),
-                'max_depth': parameters.get('max_depth', 6),
+            # LightGBMのパラメータ設定
+            lgb_params = {
+                'objective': 'multiclass',
+                'num_class': 3,
+                'metric': 'multi_logloss',
+                'boosting_type': 'gbdt',
+                'num_leaves': 31,
                 'learning_rate': parameters.get('learning_rate', 0.1),
-                'min_samples_split': parameters.get('min_samples_split', 20),
-                'min_samples_leaf': parameters.get('min_samples_leaf', 10)
+                'feature_fraction': 0.9,
+                'bagging_fraction': 0.8,
+                'bagging_freq': 5,
+                'min_data_in_leaf': 20,
+                'verbose': -1,
+                'random_state': 42
             }
             
-            model.train(X_train, y_train, model_params)
+            model.params = lgb_params
+            model.train(X_train, y_train)
             model.feature_columns = feature_columns
             
             return model

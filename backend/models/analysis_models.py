@@ -79,7 +79,7 @@ class SessionStatistics(TradingStatistics):
 
 class HourlyStatistics(TradingStatistics):
     """時間別統計"""
-    hour: str = Field(..., regex=r"^([01]?[0-9]|2[0-3]):(00|30)$", description="時刻（HH:MM形式）")
+    hour: str = Field(..., pattern=r"^([01]?[0-9]|2[0-3]):(00|30)$", description="時刻（HH:MM形式）")
     market_session: MarketSession = Field(..., description="市場セッション")
     avg_duration_minutes: Optional[float] = Field(None, description="平均取引時間（分）")
     news_events_count: Optional[int] = Field(None, ge=0, description="ニュースイベント数")
@@ -267,7 +267,7 @@ class EntryExitPair(BaseModel):
 class EntryExitAnalysisRequest(BaseModel):
     """エントリー・エグジット分析リクエスト"""
     symbol: CurrencyPair = Field(..., description="通貨ペア")
-    position_type: str = Field(default="both", regex="^(buy|sell|both)$", description="ポジション種別")
+    position_type: str = Field(default="both", pattern="^(buy|sell|both)$", description="ポジション種別")
     min_holding_hours: int = Field(default=1, ge=1, le=24, description="最小保有時間")
     max_holding_hours: int = Field(default=12, ge=1, le=24, description="最大保有時間")
     analysis_period_days: int = Field(default=365, ge=90, le=1095, description="分析期間（日）")
@@ -332,7 +332,7 @@ class AnalysisWarning(BaseModel):
     """分析警告"""
     warning_code: str = Field(..., description="警告コード")
     warning_message: str = Field(..., description="警告メッセージ")
-    severity: str = Field(default="medium", regex="^(low|medium|high)$", description="重要度")
+    severity: str = Field(default="medium", pattern="^(low|medium|high)$", description="重要度")
     recommendations: List[str] = Field(default_factory=list, description="推奨対応")
 
 
@@ -340,7 +340,7 @@ class AnalysisWarning(BaseModel):
 
 class AnalysisApiResponse(BaseModel):
     """分析API共通レスポンス"""
-    status: str = Field(default="success", regex="^(success|warning|error)$", description="ステータス")
+    status: str = Field(default="success", pattern="^(success|warning|error)$", description="ステータス")
     message: str = Field(default="Analysis completed successfully", description="メッセージ")
     data: Optional[Union[
         MarketSessionAnalysisResponse,

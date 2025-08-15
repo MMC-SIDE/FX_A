@@ -10,7 +10,17 @@ import aiohttp
 from sqlalchemy.orm import Session
 
 from backend.core.database import DatabaseManager
-from backend.models.database_models import EconomicCalendar, PriceData
+# from backend.models.database_models import EconomicCalendar, PriceData
+
+# Temporary dummy classes until database_models.py is created
+class EconomicCalendar:
+    event_time = None
+    event_name = None
+    currency = None
+    impact = None
+
+class PriceData:
+    pass
 
 logger = logging.getLogger(__name__)
 
@@ -310,7 +320,7 @@ class EconomicNewsAnalyzer:
     
     async def _analyze_event_volatility(self, 
                                       symbol: str, 
-                                      event: EconomicCalendar, 
+                                      event: Any, 
                                       time_window_minutes: int) -> Optional[Dict[str, Any]]:
         """
         イベント前後のボラティリティ分析

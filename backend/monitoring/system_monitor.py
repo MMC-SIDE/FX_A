@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import text
 
 from ..websocket.websocket_manager import WebSocketManager
-from ..core.database import get_db
+# from ..core.database import get_db
 
 logger = logging.getLogger(__name__)
 

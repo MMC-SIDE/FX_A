@@ -1,0 +1,19 @@
+{
+  "symbol": "USDJPY",
+  "timeframe": "H1",
+  "start_date": "2025-07-20T00:00:00",
+  "end_date": "2025-08-15T00:00:00",
+  "initial_balance": 100000,
+  "parameters": {
+    "risk_per_trade": 2.0,
+    "stop_loss_pips": 50,
+    "take_profit_pips": 100,
+    "min_confidence": 0.6,
+    "use_nanpin": false,
+    "commission_per_lot": 500,
+    "spread_pips": 1,
+    "n_estimators": 50,
+    "max_depth": 4,
+    "learning_rate": 0.1
+  }
+}

@@ -6,6 +6,65 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 XMTradingのMT5とPython、LightGBM機械学習モデルを統合したFX自動売買システムです。
 
+## 重要: Windows バッチファイルの文字コード問題と対処法
+
+### 問題
+Windowsのバッチファイル（.bat）で日本語を使用すると、文字化けエラーが発生することがあります：
+```
+'繝ｧ繝ｳ繧貞ｮ御ｺ・＠縺ｾ縺励◆' は、内部コマンドまたは外部コマンド、
+操作可能なプログラムまたはバッチ ファイルとして認識されていません。
+```
+
+### 原因
+- Windowsのコマンドプロンプトとバッチファイルの文字エンコーディングの不一致
+- `chcp 65001`（UTF-8設定）を使用しても完全には解決しない
+- 特にPython 3.12環境では問題が発生しやすい
+
+### 解決方法
+
+#### 1. バッチファイルは英語のみで作成
+```batch
+@echo off
+REM 日本語コメントは避ける - Avoid Japanese comments
+echo Starting system...  REM "システムを起動中..." ではなく英語を使用
+```
+
+#### 2. シンプルなバッチファイルを使用
+複雑な処理を避け、基本的なコマンドのみを使用：
+```batch
+@echo off
+title Simple Start
+python -m uvicorn backend.main:app
+```
+
+#### 3. 推奨バッチファイル
+以下のシンプルなバッチファイルを使用することを推奨：
+- `install_backend_simple.bat` - バックエンドパッケージのインストール
+- `start_all.bat` - システム全体の起動
+- `start_simple_backend.bat` - バックエンドのみ起動
+- `start_simple_frontend.bat` - フロントエンドのみ起動
+
+### Python 3.12での追加の注意事項
+
+#### distutilsエラーの対処
+Python 3.12では`distutils`が削除されたため、以下の対処が必要：
+
+1. **UV (uv) を使用**（推奨）
+```bash
+pip install uv
+python -m uv pip install [package]
+```
+
+2. **setuptoolsを先にインストール**
+```bash
+pip install --upgrade setuptools wheel
+pip install [other-packages]
+```
+
+3. **互換性のあるパッケージバージョンを使用**
+- `psycopg2-binary`の代わりに`psycopg[binary]`を使用
+- 最新の安定版パッケージを使用
+
 ## 要件定義
 
 ### システム基本情報

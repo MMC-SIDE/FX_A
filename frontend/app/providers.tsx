@@ -10,20 +10,35 @@ import { ThemeProvider, createTheme } from '@mui/material/styles'
 import { CssBaseline } from '@mui/material'
 import { useUISelectors } from '@/store/ui'
 
-// React Query クライアント設定
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 30000, // 30秒
-      refetchOnWindowFocus: false,
-      retry: 3,
-      retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000)
-    },
-    mutations: {
-      retry: 1
+// React Query クライアント設定を関数内に移動
+function makeQueryClient() {
+  return new QueryClient({
+    defaultOptions: {
+      queries: {
+        staleTime: 30000, // 30秒
+        refetchOnWindowFocus: false,
+        retry: 3,
+        retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000)
+      },
+      mutations: {
+        retry: 1
+      }
     }
+  })
+}
+
+let browserQueryClient: QueryClient | undefined = undefined
+
+function getQueryClient() {
+  if (typeof window === 'undefined') {
+    // Server: always make a new query client
+    return makeQueryClient()
+  } else {
+    // Browser: make a new query client if we don't already have one
+    if (!browserQueryClient) browserQueryClient = makeQueryClient()
+    return browserQueryClient
   }
-})
+}
 
 // MUI テーマ設定
 const lightTheme = createTheme({
@@ -180,19 +195,24 @@ const darkTheme = createTheme({
 // テーマプロバイダー
 function ThemeContextProvider({ children }: { children: React.ReactNode }) {
   const { theme } = useUISelectors()
+  const [mounted, setMounted] = React.useState(false)
+  
+  React.useEffect(() => {
+    setMounted(true)
+  }, [])
   
   const selectedTheme = React.useMemo(() => {
     if (theme === 'dark') return darkTheme
     if (theme === 'light') return lightTheme
     
-    // システムテーマの場合
-    if (typeof window !== 'undefined') {
+    // システムテーマの場合 - マウント後のみ実行
+    if (mounted && theme === 'system') {
       const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
       return prefersDark ? darkTheme : lightTheme
     }
     
     return lightTheme
-  }, [theme])
+  }, [theme, mounted])
 
   return (
     <ThemeProvider theme={selectedTheme}>
@@ -203,11 +223,18 @@ function ThemeContextProvider({ children }: { children: React.ReactNode }) {
 }
 
 export function Providers({ children }: { children: React.ReactNode }) {
+  const [queryClient] = React.useState(() => getQueryClient())
+  const [mounted, setMounted] = React.useState(false)
+
+  React.useEffect(() => {
+    setMounted(true)
+  }, [])
+
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeContextProvider>
         {children}
-        {process.env.NODE_ENV === 'development' && (
+        {mounted && process.env.NODE_ENV === 'development' && (
           <ReactQueryDevtools initialIsOpen={false} />
         )}
       </ThemeContextProvider>

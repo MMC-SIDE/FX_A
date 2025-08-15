@@ -3,11 +3,8 @@ const nextConfig = {
   // 本番環境用のスタンドアロン出力設定
   output: 'standalone',
   
-  // 実験的機能の設定
-  experimental: {
-    // サーバーサイドコンポーネントで外部パッケージを最適化
-    serverComponentsExternalPackages: ['@prisma/client'],
-  },
+  // サーバーサイドで外部パッケージを最適化（Next.js 15で移動）
+  serverExternalPackages: ['@prisma/client'],
   
   // 画像最適化設定
   images: {

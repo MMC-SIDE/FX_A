@@ -1,27 +1,43 @@
 """
 MT5接続クライアント
 """
-import MetaTrader5 as mt5
 import json
 import logging
 import time
 import pandas as pd
 from datetime import datetime, timedelta
-from typing import Optional, Dict, List, Tuple
+from typing import Optional, Dict, List, Tuple, Any
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-# 時間軸マッピング
-TIMEFRAME_MAP = {
-    "M1": mt5.TIMEFRAME_M1,
-    "M5": mt5.TIMEFRAME_M5,
-    "M15": mt5.TIMEFRAME_M15,
-    "M30": mt5.TIMEFRAME_M30,
-    "H1": mt5.TIMEFRAME_H1,
-    "H4": mt5.TIMEFRAME_H4,
-    "D1": mt5.TIMEFRAME_D1,
-}
+# Try to import MetaTrader5, use mock if not available
+try:
+    import MetaTrader5 as mt5
+    MT5_AVAILABLE = True
+    # 時間軸マッピング
+    TIMEFRAME_MAP = {
+        "M1": mt5.TIMEFRAME_M1,
+        "M5": mt5.TIMEFRAME_M5,
+        "M15": mt5.TIMEFRAME_M15,
+        "M30": mt5.TIMEFRAME_M30,
+        "H1": mt5.TIMEFRAME_H1,
+        "H4": mt5.TIMEFRAME_H4,
+        "D1": mt5.TIMEFRAME_D1,
+    }
+except ImportError:
+    logger.warning("MetaTrader5 not available. Running in mock mode.")
+    MT5_AVAILABLE = False
+    # Mock values for development
+    TIMEFRAME_MAP = {
+        "M1": 1,
+        "M5": 5,
+        "M15": 15,
+        "M30": 30,
+        "H1": 60,
+        "H4": 240,
+        "D1": 1440,
+    }
 
 # 対象通貨ペア
 TARGET_SYMBOLS = [
@@ -57,16 +73,36 @@ class MT5Client:
         if not self.load_config():
             return False
             
+        if not MT5_AVAILABLE:
+            logger.warning("Running in mock mode - MT5 not available")
+            self.is_connected = True
+            return True
+            
         try:
-            # MT5を初期化
-            if not mt5.initialize(
-                path=self.config.get("path"),
+            # MT5ターミナルが起動している場合の初期化
+            if not mt5.initialize():
+                logger.error(f"MT5 initialization failed: {mt5.last_error()}")
+                return False
+            
+            # 認証情報を使用してログイン
+            login_result = mt5.login(
                 login=self.config.get("login"),
                 password=self.config.get("password"),
-                server=self.config.get("server"),
-                timeout=self.config.get("timeout", 60000)
-            ):
-                logger.error(f"MT5 initialization failed: {mt5.last_error()}")
+                server=self.config.get("server")
+            )
+            
+            if not login_result:
+                last_error = mt5.last_error()
+                logger.error(f"MT5 login failed: {last_error}")
+                mt5.shutdown()
+                
+                # 特定のエラーの場合、詳細メッセージを提供
+                if last_error and last_error[0] == -6:
+                    logger.error("Authorization failed. Please ensure:")
+                    logger.error("1. MT5 terminal is running")
+                    logger.error("2. You can login manually with the same credentials")
+                    logger.error("3. The account is not locked or suspended")
+                
                 return False
             
             # 接続確認
@@ -86,7 +122,8 @@ class MT5Client:
     def disconnect(self) -> None:
         """MT5から切断"""
         if self.is_connected:
-            mt5.shutdown()
+            if MT5_AVAILABLE:
+                mt5.shutdown()
             self.is_connected = False
             logger.info("Disconnected from MT5")
     
@@ -94,6 +131,21 @@ class MT5Client:
         """アカウント情報取得"""
         if not self.is_connected:
             return None
+            
+        if not MT5_AVAILABLE:
+            # Return mock data for development
+            return {
+                "login": "DEMO_ACCOUNT",
+                "server": "DEMO_SERVER",
+                "name": "Demo User",
+                "company": "Demo Company",
+                "currency": "JPY",
+                "balance": 100000.0,
+                "equity": 100000.0,
+                "margin": 0.0,
+                "margin_free": 100000.0,
+                "margin_level": 0.0
+            }
             
         account_info = mt5.account_info()
         if account_info is None:
@@ -116,6 +168,10 @@ class MT5Client:
         """利用可能な通貨ペア一覧取得"""
         if not self.is_connected:
             return []
+            
+        if not MT5_AVAILABLE:
+            # Return mock symbols for development
+            return TARGET_SYMBOLS
             
         symbols = mt5.symbols_get()
         if symbols is None:
@@ -144,6 +200,22 @@ class MT5Client:
         if timeframe not in TIMEFRAME_MAP:
             logger.error(f"Invalid timeframe: {timeframe}")
             return None
+            
+        if not MT5_AVAILABLE:
+            # Return mock data for development
+            import numpy as np
+            dates = pd.date_range(end=datetime.now(), periods=count, freq='1min')
+            mock_data = pd.DataFrame({
+                'time': dates,
+                'open': np.random.uniform(100, 110, count),
+                'high': np.random.uniform(110, 115, count),
+                'low': np.random.uniform(95, 100, count),
+                'close': np.random.uniform(100, 110, count),
+                'tick_volume': np.random.randint(100, 1000, count),
+                'spread': np.random.randint(1, 5, count),
+                'real_volume': np.random.randint(1000, 10000, count)
+            })
+            return mock_data
             
         try:
             mt5_timeframe = TIMEFRAME_MAP[timeframe]
@@ -289,11 +361,16 @@ class MT5Client:
         """
         logger.info("Attempting to reconnect to MT5...")
         
+        # 既存の接続があれば切断
+        if self.is_connected:
+            self.disconnect()
+        
         for attempt in range(self.max_retries):
-            if self.is_connected:
-                self.disconnect()
-                
-            time.sleep(self.retry_delay * (attempt + 1))
+            logger.info(f"Reconnection attempt {attempt + 1}/{self.max_retries}")
+            
+            # 少し待機してから接続試行
+            if attempt > 0:
+                time.sleep(self.retry_delay * attempt)
             
             if self.connect():
                 logger.info(f"Reconnected successfully on attempt {attempt + 1}")
@@ -698,24 +775,73 @@ class MT5Client:
         }
         
         try:
-            if self.connect():
-                account_info = self.get_account_info()
-                symbols = self.get_symbols()
-                
-                result.update({
-                    "success": True,
-                    "message": "Connection successful",
-                    "account_info": account_info,
-                    "symbols_count": len(symbols)
-                })
-            else:
-                result["message"] = "Connection failed"
+            # MT5ターミナルが起動しているかまず確認
+            if not MT5_AVAILABLE:
+                result["message"] = "MetaTrader5 module not available"
+                return result
+            
+            # 初期化を試行
+            if not mt5.initialize():
+                last_error = mt5.last_error()
+                result["message"] = f"MT5 initialization failed: {last_error}"
+                return result
+            
+            # 設定ファイルを読み込み
+            if not self.load_config():
+                result["message"] = "Failed to load config file"
+                mt5.shutdown()
+                return result
+            
+            # ログインを試行
+            login_result = mt5.login(
+                login=self.config.get("login"),
+                password=self.config.get("password"),
+                server=self.config.get("server")
+            )
+            
+            if not login_result:
+                last_error = mt5.last_error()
+                result["message"] = f"Login failed: {last_error}"
+                mt5.shutdown()
+                return result
+            
+            # アカウント情報を取得
+            account_info = mt5.account_info()
+            if account_info is None:
+                result["message"] = "Failed to get account info"
+                mt5.shutdown()
+                return result
+            
+            # 利用可能なシンボル数を取得
+            symbols = mt5.symbols_get()
+            symbols_count = len(symbols) if symbols else 0
+            
+            # 成功
+            result.update({
+                "success": True,
+                "message": "Connection successful",
+                "account_info": {
+                    "login": account_info.login,
+                    "server": account_info.server,
+                    "name": account_info.name,
+                    "company": account_info.company,
+                    "currency": account_info.currency,
+                    "balance": account_info.balance,
+                    "equity": account_info.equity,
+                    "margin": account_info.margin,
+                    "margin_free": account_info.margin_free,
+                    "margin_level": account_info.margin_level
+                },
+                "symbols_count": symbols_count
+            })
                 
         except Exception as e:
             result["message"] = f"Connection test error: {e}"
         
         finally:
-            self.disconnect()
+            # テスト後は必ず切断
+            if MT5_AVAILABLE:
+                mt5.shutdown()
             
         return result
 

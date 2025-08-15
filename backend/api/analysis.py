@@ -36,13 +36,12 @@ def get_analysis_dependencies():
     """分析システムの依存関係を取得"""
     global timeframe_analyzer, news_analyzer, optimal_time_finder, db_manager
     
-    if not all([timeframe_analyzer, news_analyzer, optimal_time_finder, db_manager]):
+    if not all([timeframe_analyzer, db_manager]):
         # 初期化
         db_manager = DatabaseManager()
-        session = db_manager.get_session()
-        timeframe_analyzer = TimeframeAnalyzer(session)
-        news_analyzer = EconomicNewsAnalyzer(session)
-        optimal_time_finder = OptimalTimeFinder(session)
+        timeframe_analyzer = TimeframeAnalyzer(db_manager)
+        # news_analyzer = EconomicNewsAnalyzer(db_manager)  # 実装時に有効化
+        # optimal_time_finder = OptimalTimeFinder(db_manager)  # 実装時に有効化
     
     return timeframe_analyzer, news_analyzer, optimal_time_finder, db_manager
 
@@ -75,13 +74,18 @@ async def get_market_session_analysis(
         result = analyzer.analyze_market_sessions(symbol.value, period_days)
         
         # レスポンス構築
-        response_data = MarketSessionAnalysisResponse(
-            symbol=symbol,
-            period_days=period_days,
-            session_statistics=result['session_statistics'],
-            best_session=result.get('best_session'),
-            recommendations=result.get('recommendations', [])
-        )
+        best_session_name = None
+        if result.get('best_session'):
+            best_session_name = result['best_session'].get('session_name')
+        
+        response_data = {
+            'symbol': symbol.value,
+            'period_days': period_days,
+            'session_statistics': result['session_statistics'],
+            'best_session': best_session_name,
+            'best_session_details': result.get('best_session'),
+            'recommendations': result.get('recommendations', [])
+        }
         
         execution_time = int((time.time() - start_time) * 1000)
         
@@ -109,7 +113,7 @@ async def get_market_session_analysis(
 
 # ============= 時間別分析 =============
 
-@router.get("/hourly/{symbol}", response_model=AnalysisApiResponse)
+@router.get("/hourly/{symbol}")
 async def get_hourly_analysis(
     symbol: CurrencyPair,
     period_days: int = Query(default=365, ge=30, le=1095, description="分析期間（日）"),
@@ -142,37 +146,36 @@ async def get_hourly_analysis(
             heatmap_data = _generate_heatmap_data(result['hourly_statistics'])
         
         # レスポンス構築
-        response_data = HourlyAnalysisResponse(
-            symbol=symbol,
-            period_days=period_days,
-            hourly_statistics=result['hourly_statistics'],
-            best_hours=result.get('best_hours', []),
-            heatmap_data=heatmap_data,
-            recommendations=result.get('recommendations', [])
-        )
+        response_data = {
+            'symbol': symbol.value,
+            'period_days': period_days,
+            'hourly_statistics': result['hourly_statistics'],
+            'best_hours': result.get('best_hours', []),
+            'heatmap_data': heatmap_data,
+            'recommendations': result.get('recommendations', [])
+        }
         
         execution_time = int((time.time() - start_time) * 1000)
         
-        return AnalysisApiResponse(
-            status="success",
-            message="Hourly analysis completed successfully",
-            data=response_data,
-            execution_time_ms=execution_time
-        )
+        return {
+            "status": "success",
+            "message": "Hourly analysis completed successfully",
+            "data": response_data,
+            "execution_time_ms": execution_time,
+            "timestamp": datetime.now().isoformat()
+        }
         
     except Exception as e:
         logger.error(f"Hourly analysis failed: {e}")
         execution_time = int((time.time() - start_time) * 1000)
         
-        return AnalysisApiResponse(
-            status="error",
-            message="Hourly analysis failed",
-            errors=[AnalysisError(
-                error_code="ANALYSIS_ERROR",
-                error_message=str(e)
-            )],
-            execution_time_ms=execution_time
-        )
+        return {
+            "status": "error",
+            "message": "Hourly analysis failed",
+            "errors": [{"error_code": "ANALYSIS_ERROR", "error_message": str(e)}],
+            "execution_time_ms": execution_time,
+            "timestamp": datetime.now().isoformat()
+        }
 
 
 def _generate_heatmap_data(hourly_stats: Dict[str, Any]) -> List[List[float]]:
@@ -854,6 +857,28 @@ async def refresh_economic_calendar(
 
 
 # ============= ヘルスチェック =============
+
+@router.get("/test-hourly/{symbol}")
+async def test_hourly_analysis_simple(symbol: str):
+    """シンプルな時間別分析テスト"""
+    try:
+        analyzer, _, _, _ = get_analysis_dependencies()
+        
+        result = analyzer.analyze_hourly_performance(symbol, 180)
+        
+        return {
+            "status": "success",
+            "symbol": symbol,
+            "total_trades": result.get('total_trades', 0),
+            "best_hours": result.get('best_hours', [])[:3],  # トップ3のみ
+            "recommendations": result.get('recommendations', [])
+        }
+        
+    except Exception as e:
+        return {
+            "status": "error",
+            "error": str(e)
+        }
 
 @router.get("/health")
 async def analysis_health_check():

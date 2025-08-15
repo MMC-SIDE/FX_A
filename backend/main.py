@@ -69,7 +69,7 @@ app = FastAPI(
 # CORS設定
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],  # Next.js dev server
+    allow_origins=["http://localhost:3000", "http://localhost:3003"],  # Next.js dev server
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -78,7 +78,17 @@ app.add_middleware(
 # ルーター追加
 app.include_router(market_router)
 app.include_router(websocket_router)
-app.include_router(ml_router)
+
+# 機械学習APIルーターを追加
+try:
+    from backend.api.ml import router as ml_router
+    app.include_router(ml_router)
+    logger.info("ML router added successfully")
+except ImportError as e:
+    logger.warning(f"Could not import ML router: {e}")
+except Exception as e:
+    logger.error(f"Error adding ML router: {e}")
+
 app.include_router(trading_router)
 app.include_router(risk_router)
 app.include_router(backtest_router)
@@ -109,7 +119,10 @@ async def health_check():
             mt5_client = MT5Client()
             test_result = mt5_client.test_connection()
             mt5_healthy = test_result["success"]
-            mt5_message = test_result["message"]
+            if not mt5_healthy:
+                mt5_message = "Terminal not running or auth failed"
+            else:
+                mt5_message = test_result["message"]
         
         overall_status = "healthy" if db_healthy else "unhealthy"
         
@@ -146,6 +159,72 @@ async def get_system_status():
     except Exception as e:
         logger.error(f"Status check error: {e}")
         raise HTTPException(status_code=500, detail="Status check failed")
+
+@app.post("/mt5/reconnect")
+async def reconnect_mt5():
+    """MT5再接続"""
+    try:
+        if not os.path.exists("config/mt5_config.json"):
+            raise HTTPException(status_code=404, detail="MT5 config file not found")
+        
+        mt5_client = MT5Client()
+        
+        # 既存の接続があれば切断
+        if mt5_client.is_connected:
+            mt5_client.disconnect()
+        
+        # 再接続試行
+        success = mt5_client.reconnect()
+        
+        if success:
+            account_info = mt5_client.get_account_info()
+            mt5_client.disconnect()  # テスト後に切断
+            
+            return {
+                "success": True,
+                "message": "MT5 reconnection successful",
+                "account_info": account_info
+            }
+        else:
+            return {
+                "success": False,
+                "message": "MT5 reconnection failed"
+            }
+            
+    except Exception as e:
+        logger.error(f"MT5 reconnection error: {e}")
+        raise HTTPException(status_code=500, detail=f"Reconnection failed: {str(e)}")
+
+@app.get("/mt5/account")
+async def get_mt5_account():
+    """MT5口座情報取得"""
+    try:
+        if not os.path.exists("config/mt5_config.json"):
+            raise HTTPException(status_code=404, detail="MT5 config file not found")
+        
+        mt5_client = MT5Client()
+        
+        # 接続確認
+        if not mt5_client.connect():
+            raise HTTPException(status_code=503, detail="MT5 connection failed")
+        
+        # 口座情報取得
+        account_info = mt5_client.get_account_info()
+        mt5_client.disconnect()
+        
+        if account_info is None:
+            raise HTTPException(status_code=503, detail="Failed to get account info")
+        
+        return {
+            "success": True,
+            "account_info": account_info
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"MT5 account info error: {e}")
+        raise HTTPException(status_code=500, detail=f"Account info retrieval failed: {str(e)}")
 
 if __name__ == "__main__":
     import uvicorn
