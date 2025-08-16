@@ -1,5 +1,7 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 import logging
 import os
 from contextlib import asynccontextmanager
@@ -65,6 +67,24 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan
 )
+
+# バリデーションエラーハンドラー
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    try:
+        body = await request.body()
+        body_str = body.decode('utf-8') if body else "No body"
+    except Exception as e:
+        body_str = f"Could not read body: {e}"
+    
+    logger.error(f"Validation error on {request.method} {request.url}")
+    logger.error(f"Request body: {body_str}")
+    logger.error(f"Validation errors: {exc.errors()}")
+    
+    return JSONResponse(
+        status_code=422,
+        content={"detail": exc.errors(), "body": body_str}
+    )
 
 # CORS設定
 app.add_middleware(

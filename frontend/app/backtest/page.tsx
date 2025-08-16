@@ -52,6 +52,8 @@ import Header from '@/components/layout/Header'
 import Sidebar from '@/components/layout/Sidebar'
 import BacktestForm from '@/components/backtest/BacktestForm'
 import BacktestResults from '@/components/backtest/BacktestResults'
+import OptimizationResults from '@/components/backtest/OptimizationResults'
+import ComprehensiveBacktestResults from '@/components/backtest/ComprehensiveBacktestResults'
 import { useUISelectors } from '@/store/ui'
 import { useBacktestResults, useDeleteBacktestResults } from '@/hooks/useBacktest'
 import { BacktestListResponse } from '@/types/backtest'
@@ -70,6 +72,8 @@ export default function BacktestPage() {
   const [selectedTests, setSelectedTests] = useState<string[]>([])
   const [showForm, setShowForm] = useState(false)
   const [showResults, setShowResults] = useState<string | null>(null)
+  const [showOptimizationResults, setShowOptimizationResults] = useState<any>(null)
+  const [showComprehensiveResults, setShowComprehensiveResults] = useState<any>(null)
   const [currentPage, setCurrentPage] = useState(1)
   const [filters, setFilters] = useState({
     symbol: '',
@@ -121,9 +125,30 @@ export default function BacktestPage() {
     }
   }
 
-  const handleFormResult = (testId: string) => {
+  const handleFormResult = (testId: string, mode?: string) => {
     setShowForm(false)
-    setShowResults(testId)
+    if (mode === 'optimization' || mode === 'comprehensive') {
+      // 最適化・包括的テストの場合は結果表示をスキップ（別ハンドラーで処理）
+    } else {
+      setShowResults(testId)
+    }
+    refetch()
+  }
+
+  const handleOptimizationResult = (result: any) => {
+    setShowForm(false)
+    setShowOptimizationResults(result)
+    refetch()
+  }
+
+  const handleComprehensiveResult = (result: any) => {
+    console.log('BacktestPage handleComprehensiveResult called with:', {
+      hasResult: !!result,
+      resultKeys: result ? Object.keys(result) : [],
+      fullResult: result
+    })
+    setShowForm(false)
+    setShowComprehensiveResults(result)
     refetch()
   }
 
@@ -133,6 +158,14 @@ export default function BacktestPage() {
 
   const handleResultsClose = () => {
     setShowResults(null)
+  }
+
+  const handleOptimizationResultsClose = () => {
+    setShowOptimizationResults(null)
+  }
+
+  const handleComprehensiveResultsClose = () => {
+    setShowComprehensiveResults(null)
   }
 
   const handleResultsDelete = (testId: string) => {
@@ -489,6 +522,8 @@ export default function BacktestPage() {
         <DialogContent>
           <BacktestForm
             onResult={handleFormResult}
+            onOptimizationResult={handleOptimizationResult}
+            onComprehensiveResult={handleComprehensiveResult}
           />
         </DialogContent>
       </Dialog>
@@ -514,6 +549,58 @@ export default function BacktestPage() {
             <BacktestResults
               testId={showResults}
               onDelete={handleResultsDelete}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* 最適化結果表示ダイアログ */}
+      <Dialog
+        open={!!showOptimizationResults}
+        onClose={handleOptimizationResultsClose}
+        maxWidth="xl"
+        fullWidth
+        sx={{ '& .MuiDialog-paper': { height: '90vh' } }}
+      >
+        <DialogTitle>
+          <Box display="flex" justifyContent="space-between" alignItems="center">
+            パラメータ最適化結果
+            <IconButton onClick={handleOptimizationResultsClose}>
+              <Close />
+            </IconButton>
+          </Box>
+        </DialogTitle>
+        <DialogContent sx={{ p: 0 }}>
+          {showOptimizationResults && (
+            <OptimizationResults
+              result={showOptimizationResults}
+              onClose={handleOptimizationResultsClose}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* 包括的バックテスト結果表示ダイアログ */}
+      <Dialog
+        open={!!showComprehensiveResults}
+        onClose={handleComprehensiveResultsClose}
+        maxWidth="xl"
+        fullWidth
+        sx={{ '& .MuiDialog-paper': { height: '90vh' } }}
+      >
+        <DialogTitle>
+          <Box display="flex" justifyContent="space-between" alignItems="center">
+            包括的バックテスト結果
+            <IconButton onClick={handleComprehensiveResultsClose}>
+              <Close />
+            </IconButton>
+          </Box>
+        </DialogTitle>
+        <DialogContent sx={{ p: 0 }}>
+          {showComprehensiveResults && (
+            <ComprehensiveBacktestResults
+              result={showComprehensiveResults}
+              onClose={handleComprehensiveResultsClose}
             />
           )}
         </DialogContent>

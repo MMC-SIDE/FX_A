@@ -271,8 +271,8 @@ export function BacktestResults({ testId, onCompare, onDelete }: BacktestResults
                 <Paper sx={{ p: 2 }}>
                   <Grid container spacing={2}>
                     {[
-                      { label: '総利益', value: formatCurrency(statistics.grossProfit), color: 'success.main' },
-                      { label: '総損失', value: formatCurrency(statistics.grossLoss), color: 'error.main' },
+                      { label: '総利益', value: formatCurrency(statistics.totalProfit), color: 'success.main' },
+                      { label: '総損失', value: formatCurrency(statistics.totalLoss), color: 'error.main' },
                       { label: 'プロフィットファクター', value: formatNumber(statistics.profitFactor, 2), color: getPerformanceColor(statistics.profitFactor, 'ratio') },
                       { label: '最大ドローダウン', value: formatPercentage(statistics.maxDrawdownPercent), color: getPerformanceColor(statistics.maxDrawdownPercent, 'drawdown') },
                       { label: 'シャープレシオ', value: formatNumber(statistics.sharpeRatio, 2), color: getPerformanceColor(statistics.sharpeRatio, 'ratio') },

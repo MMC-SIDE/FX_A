@@ -137,9 +137,10 @@ export function useComprehensiveBacktest() {
     mutationFn: async (request: ComprehensiveBacktestRequest) => {
       setProgress(0)
       
+      // Slower progress increment for comprehensive tests (can take several minutes)
       const progressInterval = setInterval(() => {
-        setProgress(prev => Math.min(prev + 2, 90))
-      }, 2000)
+        setProgress(prev => Math.min(prev + 1, 85)) // Slower increment
+      }, 3000) // Every 3 seconds
 
       try {
         const result = await backtestApi.comprehensive(request)
@@ -154,14 +155,31 @@ export function useComprehensiveBacktest() {
     },
     
     onSuccess: (result) => {
+      const isOptimized = (result as any)?.optimization_note
       showSuccess(
         '包括的テスト完了',
-        '全通貨ペア・全時間軸のバックテストが完了しました'
+        isOptimized 
+          ? '高速モード（2通貨ペア×2時間軸）でのバックテストが完了しました'
+          : '全通貨ペア・全時間軸のバックテストが完了しました'
       )
     },
     
     onError: (error: any) => {
-      const message = error.response?.data?.message || '包括的バックテストに失敗しました'
+      console.error('Comprehensive backtest error:', error)
+      let message = '包括的バックテストに失敗しました'
+      
+      if (error.code === 'ECONNABORTED') {
+        message = 'バックテストがタイムアウトしました。高速モードも完全モードも失敗した可能性があります。'
+      } else if (error.message?.includes('Fast comprehensive failed')) {
+        message = '高速モードが失敗しましたが、完全モードでの実行も失敗しました。'
+      } else if (error.response?.data?.detail) {
+        message = error.response.data.detail
+      } else if (error.response?.data?.message) {
+        message = error.response.data.message
+      } else if (error.message) {
+        message = error.message
+      }
+      
       showError('包括的テストエラー', message)
     },
 

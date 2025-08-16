@@ -42,11 +42,13 @@ import { BacktestRequest, OptimizationRequest, ComprehensiveBacktestRequest } fr
 import { CURRENCY_PAIRS, TIMEFRAMES, CURRENCY_PAIR_LABELS, TIMEFRAME_LABELS } from '@/lib/constants'
 
 interface BacktestFormProps {
-  onResult?: (testId: string) => void
+  onResult?: (testId: string, mode?: 'single' | 'optimization' | 'comprehensive') => void
+  onOptimizationResult?: (result: any) => void
+  onComprehensiveResult?: (result: any) => void
   defaultValues?: Partial<BacktestRequest>
 }
 
-export function BacktestForm({ onResult, defaultValues }: BacktestFormProps) {
+export function BacktestForm({ onResult, onOptimizationResult, onComprehensiveResult, defaultValues }: BacktestFormProps) {
   const [mode, setMode] = useState<'single' | 'optimization' | 'comprehensive'>('single')
   
   // Use fixed dates to avoid hydration mismatch
@@ -108,7 +110,7 @@ export function BacktestForm({ onResult, defaultValues }: BacktestFormProps) {
     try {
       if (mode === 'single') {
         const result = await singleBacktest.mutateAsync(formData)
-        onResult?.(result.testId)
+        onResult?.(result.testId, 'single')
       } else if (mode === 'optimization') {
         const request: OptimizationRequest = {
           symbol: formData.symbol,
@@ -116,9 +118,9 @@ export function BacktestForm({ onResult, defaultValues }: BacktestFormProps) {
           startDate: formData.startDate,
           endDate: formData.endDate,
           initialBalance: formData.initialBalance,
-          target: optimizationParams.target,
-          iterations: optimizationParams.iterations,
-          populationSize: optimizationParams.populationSize,
+          optimizationMetric: optimizationParams.target,
+          maxIterations: optimizationParams.iterations,
+          optimizationMethod: 'random_search' as any,
           parameterRanges: {
             rsiPeriod: { min: 10, max: 20, step: 1 },
             rsiOverbought: { min: 65, max: 80, step: 1 },
@@ -128,7 +130,18 @@ export function BacktestForm({ onResult, defaultValues }: BacktestFormProps) {
           }
         }
         const result = await optimization.mutateAsync(request)
-        onResult?.(result.testId)
+        console.log('Optimization result:', result)
+        
+        // 最適化結果は別のハンドラーで処理
+        if (onOptimizationResult) {
+          onOptimizationResult(result)
+        } else {
+          // フォールバック: bestTestIdがあればそれを使用
+          const testId = (result as any).bestTestId || (result as any).best_test_id
+          if (testId) {
+            onResult?.(testId, 'optimization')
+          }
+        }
       } else {
         const request: ComprehensiveBacktestRequest = {
           startDate: formData.startDate,
@@ -137,7 +150,23 @@ export function BacktestForm({ onResult, defaultValues }: BacktestFormProps) {
           parameters: formData.parameters
         }
         const result = await comprehensiveBacktest.mutateAsync(request)
-        onResult?.(result.batchId)
+        console.log('Comprehensive result received:', {
+          hasResult: !!result,
+          resultKeys: result ? Object.keys(result) : [],
+          fullResult: result
+        })
+        
+        // 包括的結果は別のハンドラーで処理
+        if (onComprehensiveResult) {
+          console.log('Calling onComprehensiveResult with:', result)
+          onComprehensiveResult(result)
+        } else {
+          // フォールバック: batchIdがあればそれを使用
+          const batchId = (result as any).batchId
+          if (batchId) {
+            onResult?.(batchId, 'comprehensive')
+          }
+        }
       }
     } catch (error) {
       console.error('Backtest error:', error)
@@ -412,9 +441,15 @@ export function BacktestForm({ onResult, defaultValues }: BacktestFormProps) {
                     {mode === 'optimization' && 'パラメータ最適化を実行中...'}
                     {mode === 'comprehensive' && '包括的バックテストを実行中...'}
                   </Typography>
+                  {mode === 'comprehensive' && (
+                    <Typography variant="caption" color="text.secondary" gutterBottom>
+                      まず高速モード（2通貨ペア×2時間軸）で実行し、失敗した場合は完全モードにフォールバックします。
+                    </Typography>
+                  )}
                   <LinearProgress variant="determinate" value={currentMutation.progress || 0} />
                   <Typography variant="caption" color="text.secondary">
                     {Math.round(currentMutation.progress || 0)}% 完了
+                    {mode === 'comprehensive' && ' - 高速モードで実行中'}
                   </Typography>
                 </Box>
               </Alert>
