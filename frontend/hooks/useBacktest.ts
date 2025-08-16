@@ -53,7 +53,24 @@ export function useBacktest() {
     },
     
     onError: (error: any) => {
-      const message = error.response?.data?.message || 'バックテストに失敗しました'
+      console.error('Backtest error:', error)
+      let message = 'バックテストに失敗しました'
+      
+      if (error.response?.data?.detail) {
+        // バリデーションエラーの場合
+        if (Array.isArray(error.response.data.detail)) {
+          message = error.response.data.detail.map((err: any) => 
+            `${err.loc?.join('.')}: ${err.msg}`
+          ).join(', ')
+        } else {
+          message = error.response.data.detail
+        }
+      } else if (error.response?.data?.message) {
+        message = error.response.data.message
+      } else if (error.message) {
+        message = error.message
+      }
+      
       showError('バックテストエラー', message)
     },
 

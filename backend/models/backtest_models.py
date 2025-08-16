@@ -64,7 +64,15 @@ class BacktestRequest(BaseModel):
 
     @validator('start_date', 'end_date')
     def dates_not_future(cls, v):
-        if v > datetime.now():
+        # Convert both datetimes to naive for comparison
+        now = datetime.now()
+        if v.tzinfo is not None:
+            # If v has timezone info, convert to naive
+            v_naive = v.replace(tzinfo=None)
+        else:
+            v_naive = v
+        
+        if v_naive > now:
             raise ValueError('Date cannot be in the future')
         return v
 

@@ -47,10 +47,7 @@ import {
   Search,
   Close
 } from '@mui/icons-material'
-import { DatePicker } from '@mui/x-date-pickers/DatePicker'
-import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider'
-import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns'
-import { ja } from 'date-fns/locale'
+// DatePickerを削除してHTML input[type="date"]を使用
 import Header from '@/components/layout/Header'
 import Sidebar from '@/components/layout/Sidebar'
 import BacktestForm from '@/components/backtest/BacktestForm'
@@ -157,7 +154,7 @@ export default function BacktestPage() {
   const isPartiallySelected = selectedTests.length > 0 && selectedTests.length < filteredTests.length
 
   return (
-    <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={ja}>
+    <div>
       <Box sx={{ display: 'flex' }}>
         {/* サイドバー */}
         <Sidebar />
@@ -238,26 +235,32 @@ export default function BacktestPage() {
                   </Grid>
 
                   <Grid item xs={12} md={2}>
-                    <DatePicker
+                    <TextField
                       label="開始日"
-                      value={filters.startDate ? new Date(filters.startDate) : null}
-                      onChange={(date) => setFilters(prev => ({ 
+                      type="date"
+                      value={filters.startDate || ''}
+                      onChange={(e) => setFilters(prev => ({ 
                         ...prev, 
-                        startDate: date?.toISOString().split('T')[0] || ''
+                        startDate: e.target.value
                       }))}
-                      slotProps={{ textField: { size: 'small', fullWidth: true } }}
+                      size="small"
+                      fullWidth
+                      InputLabelProps={{ shrink: true }}
                     />
                   </Grid>
 
                   <Grid item xs={12} md={2}>
-                    <DatePicker
+                    <TextField
                       label="終了日"
-                      value={filters.endDate ? new Date(filters.endDate) : null}
-                      onChange={(date) => setFilters(prev => ({ 
+                      type="date"
+                      value={filters.endDate || ''}
+                      onChange={(e) => setFilters(prev => ({ 
                         ...prev, 
-                        endDate: date?.toISOString().split('T')[0] || ''
+                        endDate: e.target.value
                       }))}
-                      slotProps={{ textField: { size: 'small', fullWidth: true } }}
+                      size="small"
+                      fullWidth
+                      InputLabelProps={{ shrink: true }}
                     />
                   </Grid>
 
@@ -515,6 +518,6 @@ export default function BacktestPage() {
           )}
         </DialogContent>
       </Dialog>
-    </LocalizationProvider>
+    </div>
   )
 }

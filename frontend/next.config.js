@@ -18,12 +18,12 @@ const nextConfig = {
     ],
   },
   
-  // API リライト設定（本番環境用）
+  // API リライト設定
   async rewrites() {
     return [
       {
         source: '/api/backend/:path*',
-        destination: 'https://api.fx-trading.local/api/v1/:path*',
+        destination: process.env.BACKEND_URL || 'http://localhost:8000/api/v1/:path*',
       },
     ]
   },

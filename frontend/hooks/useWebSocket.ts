@@ -263,9 +263,9 @@ export function useWebSocket(url: string, options?: {
         }
       }
 
-      ws.current.onerror = (error) => {
-        console.error('WebSocket error:', error)
-        setConnectionError('WebSocket connection error')
+      ws.current.onerror = (event) => {
+        console.error('WebSocket error occurred')
+        setConnectionError('WebSocket connection error - check if backend is running')
       }
 
     } catch (error) {

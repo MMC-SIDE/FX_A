@@ -32,10 +32,7 @@ import {
   TuneRounded,
   Analytics
 } from '@mui/icons-material'
-import { DatePicker } from '@mui/x-date-pickers/DatePicker'
-import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider'
-import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns'
-import { ja } from 'date-fns/locale'
+// DatePickerを削除してHTML input[type="date"]を使用
 import { 
   useBacktest, 
   useOptimization, 
@@ -51,11 +48,25 @@ interface BacktestFormProps {
 
 export function BacktestForm({ onResult, defaultValues }: BacktestFormProps) {
   const [mode, setMode] = useState<'single' | 'optimization' | 'comprehensive'>('single')
+  
+  // Use fixed dates to avoid hydration mismatch
+  const getDefaultStartDate = () => {
+    if (defaultValues?.startDate) return defaultValues.startDate
+    // Use a fixed date (1 year ago from 2024-12-31)
+    return '2023-12-31'
+  }
+  
+  const getDefaultEndDate = () => {
+    if (defaultValues?.endDate) return defaultValues.endDate
+    // Use a fixed date
+    return '2024-12-31'
+  }
+  
   const [formData, setFormData] = useState<BacktestRequest>({
     symbol: defaultValues?.symbol || 'USDJPY',
     timeframe: defaultValues?.timeframe || 'H1',
-    startDate: defaultValues?.startDate || new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-    endDate: defaultValues?.endDate || new Date().toISOString().split('T')[0],
+    startDate: getDefaultStartDate(),
+    endDate: getDefaultEndDate(),
     initialBalance: defaultValues?.initialBalance || 100000,
     parameters: {
       rsiPeriod: 14,
@@ -148,7 +159,7 @@ export function BacktestForm({ onResult, defaultValues }: BacktestFormProps) {
   const currentMutation = getCurrentMutation()
 
   return (
-    <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={ja}>
+    <div>
       <Card>
         <CardHeader
           title="バックテスト実行"
@@ -216,21 +227,25 @@ export function BacktestForm({ onResult, defaultValues }: BacktestFormProps) {
                 )}
                 
                 <Grid item xs={12} md={4}>
-                  <DatePicker
+                  <TextField
                     label="開始日"
-                    value={new Date(formData.startDate)}
-                    onChange={(date) => updateFormData('startDate', date?.toISOString().split('T')[0])}
+                    type="date"
+                    value={formData.startDate}
+                    onChange={(e) => updateFormData('startDate', e.target.value)}
                     disabled={isLoading}
-                    slotProps={{ textField: { fullWidth: true } }}
+                    fullWidth
+                    InputLabelProps={{ shrink: true }}
                   />
                 </Grid>
                 <Grid item xs={12} md={4}>
-                  <DatePicker
+                  <TextField
                     label="終了日"
-                    value={new Date(formData.endDate)}
-                    onChange={(date) => updateFormData('endDate', date?.toISOString().split('T')[0])}
+                    type="date"
+                    value={formData.endDate}
+                    onChange={(e) => updateFormData('endDate', e.target.value)}
                     disabled={isLoading}
-                    slotProps={{ textField: { fullWidth: true } }}
+                    fullWidth
+                    InputLabelProps={{ shrink: true }}
                   />
                 </Grid>
                 <Grid item xs={12} md={4}>
@@ -422,7 +437,7 @@ export function BacktestForm({ onResult, defaultValues }: BacktestFormProps) {
           </Box>
         </CardContent>
       </Card>
-    </LocalizationProvider>
+    </div>
   )
 }
 

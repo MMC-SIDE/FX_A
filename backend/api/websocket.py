@@ -308,3 +308,120 @@ async def websocket_trading_updates(websocket: WebSocket):
         logger.info("Trading WebSocket disconnected")
     except Exception as e:
         logger.error(f"Trading WebSocket error: {e}")
+
+@router.websocket("/monitoring")
+async def websocket_monitoring(websocket: WebSocket):
+    """
+    監視用WebSocketエンドポイント
+    システム統計、アラート、ログなどを配信
+    """
+    await websocket.accept()
+    
+    try:
+        # 接続確認メッセージ
+        await websocket.send_text(json.dumps({
+            "type": "connection_established",
+            "data": {
+                "status": "connected",
+                "message": "Monitoring WebSocket connected successfully",
+                "timestamp": datetime.now().isoformat()
+            }
+        }))
+        
+        # 定期的にシステム統計を送信
+        while True:
+            try:
+                # システム統計のモックデータ
+                system_stats = {
+                    "type": "system_stats",
+                    "timestamp": datetime.now().isoformat(),
+                    "data": {
+                        "timestamp": datetime.now().isoformat(),
+                        "uptime_seconds": 3600,
+                        "uptime_human": "1 hour",
+                        "cpu_percent": 25.5,
+                        "cpu_count": 4,
+                        "memory_percent": 45.2,
+                        "memory_total_gb": 16.0,
+                        "memory_available_gb": 8.8,
+                        "memory_used_gb": 7.2,
+                        "disk_percent": 65.0,
+                        "disk_total_gb": 500.0,
+                        "disk_free_gb": 175.0,
+                        "disk_used_gb": 325.0,
+                        "network_sent_mb": 150.5,
+                        "network_recv_mb": 200.3,
+                        "network_packets_sent": 10000,
+                        "network_packets_recv": 12000,
+                        "process_memory_mb": 256.5,
+                        "process_memory_vms_mb": 512.0,
+                        "websocket_connections": len(manager.active_connections)
+                    }
+                }
+                
+                await websocket.send_text(json.dumps(system_stats))
+                
+                # 取引統計のモックデータ
+                trading_stats = {
+                    "type": "trading_stats",
+                    "timestamp": datetime.now().isoformat(),
+                    "data": {
+                        "today_stats": {
+                            "date": datetime.now().date().isoformat(),
+                            "total_trades": 10,
+                            "winning_trades": 6,
+                            "losing_trades": 4,
+                            "win_rate": 0.6,
+                            "total_pnl": 5000.0,
+                            "gross_profit": 8000.0,
+                            "gross_loss": -3000.0,
+                            "largest_win": 2000.0,
+                            "largest_loss": -1000.0,
+                            "average_win": 1333.33,
+                            "average_loss": -750.0,
+                            "profit_factor": 2.67
+                        },
+                        "current_pnl": {
+                            "total_profit": 5000.0,
+                            "unrealized_pnl": 500.0,
+                            "position_count": 2,
+                            "updated_at": datetime.now().isoformat()
+                        },
+                        "account_info": {
+                            "login": 12345678,
+                            "balance": 105000.0,
+                            "equity": 105500.0,
+                            "equity_change": 0.48,
+                            "margin": 1000.0,
+                            "margin_free": 104500.0,
+                            "margin_level": 10550.0,
+                            "margin_level_change": 0.0,
+                            "profit": 500.0,
+                            "currency": "JPY",
+                            "server": "XMTrading-Real",
+                            "company": "XM Trading",
+                            "updated_at": datetime.now().isoformat()
+                        }
+                    }
+                }
+                
+                await websocket.send_text(json.dumps(trading_stats))
+                
+                # ハートビート
+                heartbeat = {
+                    "type": "heartbeat",
+                    "timestamp": datetime.now().isoformat()
+                }
+                await websocket.send_text(json.dumps(heartbeat))
+                
+                # 5秒ごとに更新
+                await asyncio.sleep(5)
+                
+            except Exception as e:
+                logger.error(f"Error sending monitoring data: {e}")
+                break
+    
+    except WebSocketDisconnect:
+        logger.info("Monitoring WebSocket disconnected")
+    except Exception as e:
+        logger.error(f"Monitoring WebSocket error: {e}")

@@ -49,6 +49,7 @@ const fetchMT5Account = async () => {
 
 export default function Home() {
   const queryClient = useQueryClient()
+  const [mounted, setMounted] = useState(false)
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' })
 
   const { data: status } = useQuery({
@@ -62,6 +63,11 @@ export default function Home() {
     queryFn: fetchHealthCheck,
     refetchInterval: 10000
   })
+
+  // useEffectでmountedフラグを設定
+  React.useEffect(() => {
+    setMounted(true)
+  }, [])
 
   // MT5口座情報を取得
   const { data: mt5Account } = useQuery({
@@ -290,10 +296,85 @@ export default function Home() {
 
                 <Box sx={{ mt: 3 }}>
                   <Typography variant="body2" color="text.secondary">
-                    最終更新: {new Date().toLocaleString('ja-JP')}
+                    最終更新: {mounted ? new Date().toLocaleString('ja-JP') : '---'}
                   </Typography>
                 </Box>
               </Box>
+            </Paper>
+          </Grid>
+
+          {/* 機能ナビゲーション */}
+          <Grid item xs={12}>
+            <Paper sx={{ p: 3 }}>
+              <Typography variant="h5" gutterBottom fontWeight="bold">
+                システム機能
+              </Typography>
+              
+              <Grid container spacing={2} sx={{ mt: 2 }}>
+                <Grid item xs={12} sm={6} md={3}>
+                  <Link href="/trading" style={{ textDecoration: 'none' }}>
+                    <Card variant="outlined" sx={{ cursor: 'pointer', '&:hover': { backgroundColor: 'action.hover' } }}>
+                      <CardContent sx={{ textAlign: 'center' }}>
+                        <TrendingUp sx={{ fontSize: 40, color: 'primary.main', mb: 1 }} />
+                        <Typography variant="h6" fontWeight="bold">
+                          自動売買制御
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          取引の開始・停止・監視
+                        </Typography>
+                      </CardContent>
+                    </Card>
+                  </Link>
+                </Grid>
+
+                <Grid item xs={12} sm={6} md={3}>
+                  <Link href="/backtest" style={{ textDecoration: 'none' }}>
+                    <Card variant="outlined" sx={{ cursor: 'pointer', '&:hover': { backgroundColor: 'action.hover' } }}>
+                      <CardContent sx={{ textAlign: 'center' }}>
+                        <Assessment sx={{ fontSize: 40, color: 'secondary.main', mb: 1 }} />
+                        <Typography variant="h6" fontWeight="bold">
+                          バックテスト
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          過去データでの戦略検証
+                        </Typography>
+                      </CardContent>
+                    </Card>
+                  </Link>
+                </Grid>
+
+                <Grid item xs={12} sm={6} md={3}>
+                  <Link href="/ml" style={{ textDecoration: 'none' }}>
+                    <Card variant="outlined" sx={{ cursor: 'pointer', '&:hover': { backgroundColor: 'action.hover' } }}>
+                      <CardContent sx={{ textAlign: 'center' }}>
+                        <ShowChart sx={{ fontSize: 40, color: 'success.main', mb: 1 }} />
+                        <Typography variant="h6" fontWeight="bold">
+                          機械学習
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          LightGBMモデル管理
+                        </Typography>
+                      </CardContent>
+                    </Card>
+                  </Link>
+                </Grid>
+
+                <Grid item xs={12} sm={6} md={3}>
+                  <Link href="/settings" style={{ textDecoration: 'none' }}>
+                    <Card variant="outlined" sx={{ cursor: 'pointer', '&:hover': { backgroundColor: 'action.hover' } }}>
+                      <CardContent sx={{ textAlign: 'center' }}>
+                        <Settings sx={{ fontSize: 40, color: 'warning.main', mb: 1 }} />
+                        <Typography variant="h6" fontWeight="bold">
+                          設定
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          システム設定・管理
+                        </Typography>
+                      </CardContent>
+                    </Card>
+                  </Link>
+                </Grid>
+              </Grid>
             </Paper>
           </Grid>
 

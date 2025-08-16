@@ -43,7 +43,11 @@ export function TradingSettings() {
   const { updateTradingSettings } = useSettingsActions()
   const { showSuccess, showError } = useNotifications()
   
-  const [localSettings, setLocalSettings] = useState(tradingSettings)
+  const [localSettings, setLocalSettings] = useState({
+    ...tradingSettings,
+    preferredCurrencies: tradingSettings.preferredCurrencies || ['USDJPY', 'EURJPY'],
+    tradingTimeframes: tradingSettings.tradingTimeframes || ['H1']
+  })
   const [hasChanges, setHasChanges] = useState(false)
 
   const handleChange = (field: string, value: any) => {

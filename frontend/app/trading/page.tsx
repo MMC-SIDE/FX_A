@@ -1,8 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card-simple'
+import { Button } from '@/components/ui/Button'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
@@ -15,8 +15,10 @@ import {
   Shield,
   TrendingUp,
   Clock,
-  DollarSign
+  DollarSign,
+  Home
 } from 'lucide-react'
+import Link from 'next/link'
 
 interface TradingStatus {
   is_active: boolean
@@ -50,6 +52,7 @@ interface AccountInfo {
 }
 
 export default function TradingPage() {
+  const [mounted, setMounted] = useState(false)
   const [tradingStatus, setTradingStatus] = useState<TradingStatus | null>(null)
   const [accountInfo, setAccountInfo] = useState<AccountInfo | null>(null)
   const [loading, setLoading] = useState(false)
@@ -195,6 +198,7 @@ export default function TradingPage() {
   }
 
   useEffect(() => {
+    setMounted(true)
     fetchTradingStatus()
     fetchAccountInfo()
 
@@ -210,10 +214,22 @@ export default function TradingPage() {
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">自動売買制御</h1>
-        <p className="text-gray-600">
-          MT5自動売買システムの開始・停止・監視を行います
-        </p>
+        <div className="flex justify-between items-start mb-4">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">自動売買制御</h1>
+            <p className="text-gray-600">
+              MT5自動売買システムの開始・停止・監視を行います
+            </p>
+          </div>
+          <Link href="/">
+            <Button 
+              variant="outlined" 
+              startIcon={<Home className="h-4 w-4" />}
+            >
+              メインページへ
+            </Button>
+          </Link>
+        </div>
       </div>
 
       {error && (
@@ -300,23 +316,23 @@ export default function TradingPage() {
               <>
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium">残高</span>
-                  <span className="text-sm font-bold">¥{accountInfo.balance.toLocaleString()}</span>
+                  <span className="text-sm font-bold">¥{accountInfo?.balance?.toLocaleString() || 'N/A'}</span>
                 </div>
                 
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium">有効証拠金</span>
-                  <span className="text-sm font-bold">¥{accountInfo.equity.toLocaleString()}</span>
+                  <span className="text-sm font-bold">¥{accountInfo?.equity?.toLocaleString() || 'N/A'}</span>
                 </div>
                 
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium">余剰証拠金</span>
-                  <span className="text-sm">¥{accountInfo.margin_free.toLocaleString()}</span>
+                  <span className="text-sm">¥{accountInfo?.margin_free?.toLocaleString() || 'N/A'}</span>
                 </div>
                 
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium">損益</span>
-                  <span className={`text-sm font-bold ${accountInfo.profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                    {accountInfo.profit >= 0 ? '+' : ''}¥{accountInfo.profit.toLocaleString()}
+                  <span className={`text-sm font-bold ${accountInfo?.profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    {accountInfo?.profit !== undefined ? `${accountInfo.profit >= 0 ? '+' : ''}¥${accountInfo.profit.toLocaleString()}` : 'N/A'}
                   </span>
                 </div>
                 
@@ -341,7 +357,7 @@ export default function TradingPage() {
       </div>
 
       {/* リスク状態 */}
-      {tradingStatus?.risk_status && (
+      {tradingStatus?.risk_status && !tradingStatus.risk_status.error && (
         <Card className="mb-8">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -353,29 +369,38 @@ export default function TradingPage() {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div className="text-center">
                 <p className="text-sm text-gray-500">緊急停止</p>
-                <Badge variant={tradingStatus.risk_status.emergency_stop ? "destructive" : "default"}>
-                  {tradingStatus.risk_status.emergency_stop ? '有効' : '無効'}
+                <Badge variant={tradingStatus.risk_status?.emergency_stop ? "destructive" : "default"}>
+                  {tradingStatus.risk_status?.emergency_stop ? '有効' : tradingStatus.risk_status?.error ? 'エラー' : '無効'}
                 </Badge>
               </div>
               
               <div className="text-center">
                 <p className="text-sm text-gray-500">ドローダウン</p>
                 <p className="text-lg font-bold">
-                  {(tradingStatus.risk_status.current_drawdown * 100).toFixed(1)}%
+                  {tradingStatus.risk_status?.current_drawdown !== undefined ? 
+                    `${(tradingStatus.risk_status.current_drawdown * 100).toFixed(1)}%` : 
+                    'N/A'
+                  }
                 </p>
               </div>
               
               <div className="text-center">
                 <p className="text-sm text-gray-500">ポジション数</p>
                 <p className="text-lg font-bold">
-                  {tradingStatus.risk_status.current_positions}/{tradingStatus.risk_status.max_positions}
+                  {tradingStatus.risk_status?.current_positions !== undefined && tradingStatus.risk_status?.max_positions !== undefined ? 
+                    `${tradingStatus.risk_status.current_positions}/${tradingStatus.risk_status.max_positions}` : 
+                    'N/A'
+                  }
                 </p>
               </div>
               
               <div className="text-center">
                 <p className="text-sm text-gray-500">日次損益</p>
-                <p className={`text-lg font-bold ${tradingStatus.risk_status.daily_pnl >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                  {tradingStatus.risk_status.daily_pnl >= 0 ? '+' : ''}¥{tradingStatus.risk_status.daily_pnl.toFixed(0)}
+                <p className={`text-lg font-bold ${tradingStatus.risk_status?.daily_pnl >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                  {tradingStatus.risk_status?.daily_pnl !== undefined ? 
+                    `${tradingStatus.risk_status.daily_pnl >= 0 ? '+' : ''}¥${tradingStatus.risk_status.daily_pnl.toFixed(0)}` : 
+                    'N/A'
+                  }
                 </p>
               </div>
             </div>
@@ -489,7 +514,7 @@ export default function TradingPage() {
       {tradingStatus && (
         <div className="text-center text-sm text-gray-500">
           <Clock className="inline h-4 w-4 mr-1" />
-          最終更新: {new Date(tradingStatus.last_update).toLocaleString('ja-JP')}
+          最終更新: {mounted && tradingStatus?.last_update ? new Date(tradingStatus.last_update).toLocaleString('ja-JP') : tradingStatus?.last_update || '---'}
         </div>
       )}
     </div>
