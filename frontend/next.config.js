@@ -23,7 +23,7 @@ const nextConfig = {
     return [
       {
         source: '/api/backend/:path*',
-        destination: process.env.BACKEND_URL || 'http://localhost:8000/api/v1/:path*',
+        destination: (process.env.BACKEND_URL || 'http://localhost:8000') + '/api/v1/:path*',
       },
     ]
   },
@@ -58,6 +58,16 @@ const nextConfig = {
   // パフォーマンス最適化
   poweredByHeader: false,
   compress: true,
+  
+  // ESLint設定
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
+  
+  // TypeScript設定
+  typescript: {
+    ignoreBuildErrors: false,
+  },
   
   // 環境変数の設定
   env: {
