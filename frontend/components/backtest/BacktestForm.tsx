@@ -4,6 +4,8 @@
 'use client'
 
 import React, { useState } from 'react'
+import { BacktestProgressDialog } from './BacktestProgressDialog'
+import { useBacktestProgress } from '@/hooks/useBacktestProgress'
 import {
   Card,
   CardContent,
@@ -45,11 +47,54 @@ interface BacktestFormProps {
   onResult?: (testId: string, mode?: 'single' | 'optimization' | 'comprehensive') => void
   onOptimizationResult?: (result: any) => void
   onComprehensiveResult?: (result: any) => void
+  onError?: (error: any) => void
+  onStart?: () => void
+  onProgress?: (progress: number) => void
   defaultValues?: Partial<BacktestRequest>
 }
 
-export function BacktestForm({ onResult, onOptimizationResult, onComprehensiveResult, defaultValues }: BacktestFormProps) {
+export function BacktestForm({ onResult, onOptimizationResult, onComprehensiveResult, onError, onStart, onProgress, defaultValues }: BacktestFormProps) {
   const [mode, setMode] = useState<'single' | 'optimization' | 'comprehensive'>('single')
+  const [currentTestId, setCurrentTestId] = useState<string | null>(null)
+  const [showProgressDialog, setShowProgressDialog] = useState(false)
+  
+  // 進捗追跡フック
+  const { progress, isLoading: progressLoading, error: progressError } = useBacktestProgress({
+    testId: currentTestId || undefined,
+    onComplete: async (finalProgress) => {
+      console.log('Backtest completed:', finalProgress)
+      
+      // 包括的バックテストの場合、完了後に結果を取得
+      if (mode === 'comprehensive' && currentTestId) {
+        try {
+          console.log('Fetching comprehensive backtest results for:', currentTestId)
+          const response = await fetch(`/api/backend/backtest/results/${currentTestId}`)
+          if (response.ok) {
+            const comprehensiveResult = await response.json()
+            console.log('Comprehensive backtest result fetched:', comprehensiveResult)
+            
+            // 親コンポーネントに結果を通知
+            if (onComprehensiveResult) {
+              onComprehensiveResult(comprehensiveResult.data)
+            }
+          } else {
+            console.error('Failed to fetch comprehensive result:', response.statusText)
+          }
+        } catch (error) {
+          console.error('Error fetching comprehensive result:', error)
+        }
+      }
+      
+      // 完了後、5秒待ってからダイアログを閉じる
+      setTimeout(() => {
+        setShowProgressDialog(false)
+        setCurrentTestId(null)
+      }, 5000)
+    },
+    onError: (error) => {
+      console.error('Backtest progress error:', error)
+    }
+  })
   
   // Use fixed dates to avoid hydration mismatch
   const getDefaultStartDate = () => {
@@ -107,9 +152,14 @@ export function BacktestForm({ onResult, onOptimizationResult, onComprehensiveRe
   const handleSubmit = async () => {
     const currentMutation = getCurrentMutation()
 
+    // 実行開始を通知
+    onStart?.()
+
     try {
       if (mode === 'single') {
+        onProgress?.(10)
         const result = await singleBacktest.mutateAsync(formData)
+        onProgress?.(100)
         onResult?.(result.testId, 'single')
       } else if (mode === 'optimization') {
         const request: OptimizationRequest = {
@@ -144,32 +194,64 @@ export function BacktestForm({ onResult, onOptimizationResult, onComprehensiveRe
         }
       } else {
         const request: ComprehensiveBacktestRequest = {
+          // 明示的に全通貨ペア・全時間軸を指定
+          symbols: ['USDJPY', 'EURJPY', 'GBPJPY', 'AUDJPY', 'NZDJPY', 'CADJPY', 'CHFJPY'],
+          timeframes: ['M1', 'M5', 'M15', 'M30', 'H1', 'H4', 'D1'],
           startDate: formData.startDate,
           endDate: formData.endDate,
           initialBalance: formData.initialBalance,
-          parameters: formData.parameters
+          testPeriodMonths: 12,
+          parameterRanges: {
+            riskPerTrade: { min: 1.0, max: 5.0, step: 0.5 },
+            stopLossPips: { min: 20, max: 100, step: 10 },
+            takeProfitPips: { min: 40, max: 200, step: 20 }
+          },
+          optimizationMetric: 'sharpe_ratio' as any,
+          use_ml: false,
+          risk_levels: [0.01, 0.02, 0.05]
         }
-        const result = await comprehensiveBacktest.mutateAsync(request)
-        console.log('Comprehensive result received:', {
-          hasResult: !!result,
-          resultKeys: result ? Object.keys(result) : [],
-          fullResult: result
-        })
+        // 進捗ダイアログを表示
+        setShowProgressDialog(true)
         
-        // 包括的結果は別のハンドラーで処理
-        if (onComprehensiveResult) {
-          console.log('Calling onComprehensiveResult with:', result)
-          onComprehensiveResult(result)
-        } else {
-          // フォールバック: batchIdがあればそれを使用
-          const batchId = (result as any).batchId
-          if (batchId) {
-            onResult?.(batchId, 'comprehensive')
+        // バックテストを開始してサーバーからtest_idを取得
+        const startTime = Date.now()
+        console.log('Starting comprehensive backtest at:', new Date().toISOString())
+        
+        let result: any = null
+        try {
+          // まずバックテスト開始APIを呼び出してtest_idを取得
+          result = await comprehensiveBacktest.mutateAsync(request)
+          const executionTime = Date.now() - startTime
+          
+          console.log('Comprehensive result received:', {
+            hasResult: !!result,
+            resultKeys: result ? Object.keys(result) : [],
+            executionTime: `${executionTime}ms`,
+            serverTestId: (result as any).testId || (result as any).test_id
+          })
+          
+          // サーバーから返されたtest_idで進捗追跡を開始
+          const serverTestId = (result as any).testId || (result as any).test_id
+          if (serverTestId) {
+            console.log('Starting progress tracking with server test ID:', serverTestId)
+            setCurrentTestId(serverTestId)
+          } else {
+            console.warn('No test ID received from server, comprehensive backtest may not have started properly')
+            throw new Error('バックテストが正常に開始されませんでした')
           }
+          
+          // 包括的バックテスト開始時は結果タブに遷移しない（完了まで待機）
+          console.log('Comprehensive backtest started, waiting for completion...')
+          // onComprehensiveResult は進捗追跡で完了時に呼び出される
+        } catch (error) {
+          console.error('Backtest execution error:', error)
+          // エラーが発生した場合でも進捗追跡は継続
         }
       }
     } catch (error) {
       console.error('Backtest error:', error)
+      onError?.(error)
+      onProgress?.(0)
     }
   }
 
@@ -218,7 +300,7 @@ export function BacktestForm({ onResult, onOptimizationResult, onComprehensiveRe
               <Grid container spacing={2}>
                 {mode !== 'comprehensive' && (
                   <>
-                    <Grid item xs={12} md={6}>
+                    <Grid size={{ xs: 12, md: 6 }}>
                       <FormControl fullWidth>
                         <InputLabel>通貨ペア</InputLabel>
                         <Select
@@ -235,7 +317,7 @@ export function BacktestForm({ onResult, onOptimizationResult, onComprehensiveRe
                         </Select>
                       </FormControl>
                     </Grid>
-                    <Grid item xs={12} md={6}>
+                    <Grid size={{ xs: 12, md: 6 }}>
                       <FormControl fullWidth>
                         <InputLabel>時間軸</InputLabel>
                         <Select
@@ -255,7 +337,7 @@ export function BacktestForm({ onResult, onOptimizationResult, onComprehensiveRe
                   </>
                 )}
                 
-                <Grid item xs={12} md={4}>
+                <Grid size={{ xs: 12, md: 4 }}>
                   <TextField
                     label="開始日"
                     type="date"
@@ -266,7 +348,7 @@ export function BacktestForm({ onResult, onOptimizationResult, onComprehensiveRe
                     InputLabelProps={{ shrink: true }}
                   />
                 </Grid>
-                <Grid item xs={12} md={4}>
+                <Grid size={{ xs: 12, md: 4 }}>
                   <TextField
                     label="終了日"
                     type="date"
@@ -277,7 +359,7 @@ export function BacktestForm({ onResult, onOptimizationResult, onComprehensiveRe
                     InputLabelProps={{ shrink: true }}
                   />
                 </Grid>
-                <Grid item xs={12} md={4}>
+                <Grid size={{ xs: 12, md: 4 }}>
                   <TextField
                     label="初期資金"
                     type="number"
@@ -302,7 +384,7 @@ export function BacktestForm({ onResult, onOptimizationResult, onComprehensiveRe
                 </AccordionSummary>
                 <AccordionDetails>
                   <Grid container spacing={2}>
-                    <Grid item xs={12} md={4}>
+                    <Grid size={{ xs: 12, md: 4 }}>
                       <FormControl fullWidth>
                         <InputLabel>最適化目標</InputLabel>
                         <Select
@@ -320,7 +402,7 @@ export function BacktestForm({ onResult, onOptimizationResult, onComprehensiveRe
                         </Select>
                       </FormControl>
                     </Grid>
-                    <Grid item xs={12} md={4}>
+                    <Grid size={{ xs: 12, md: 4 }}>
                       <TextField
                         label="イテレーション数"
                         type="number"
@@ -333,7 +415,7 @@ export function BacktestForm({ onResult, onOptimizationResult, onComprehensiveRe
                         fullWidth
                       />
                     </Grid>
-                    <Grid item xs={12} md={4}>
+                    <Grid size={{ xs: 12, md: 4 }}>
                       <TextField
                         label="集団サイズ"
                         type="number"
@@ -363,10 +445,10 @@ export function BacktestForm({ onResult, onOptimizationResult, onComprehensiveRe
                 <AccordionDetails>
                   <Grid container spacing={3}>
                     {/* RSI設定 */}
-                    <Grid item xs={12}>
+                    <Grid size={12}>
                       <Typography variant="subtitle2" gutterBottom>RSI設定</Typography>
                       <Grid container spacing={2}>
-                        <Grid item xs={12} md={4}>
+                        <Grid size={{ xs: 12, md: 4 }}>
                           <Typography gutterBottom>期間: {formData.parameters.rsiPeriod}</Typography>
                           <Slider
                             value={formData.parameters.rsiPeriod}
@@ -376,7 +458,7 @@ export function BacktestForm({ onResult, onOptimizationResult, onComprehensiveRe
                             disabled={isLoading}
                           />
                         </Grid>
-                        <Grid item xs={12} md={4}>
+                        <Grid size={{ xs: 12, md: 4 }}>
                           <Typography gutterBottom>買われすぎ: {formData.parameters.rsiOverbought}</Typography>
                           <Slider
                             value={formData.parameters.rsiOverbought}
@@ -386,7 +468,7 @@ export function BacktestForm({ onResult, onOptimizationResult, onComprehensiveRe
                             disabled={isLoading}
                           />
                         </Grid>
-                        <Grid item xs={12} md={4}>
+                        <Grid size={{ xs: 12, md: 4 }}>
                           <Typography gutterBottom>売られすぎ: {formData.parameters.rsiOversold}</Typography>
                           <Slider
                             value={formData.parameters.rsiOversold}
@@ -400,10 +482,10 @@ export function BacktestForm({ onResult, onOptimizationResult, onComprehensiveRe
                     </Grid>
 
                     {/* リスク管理設定 */}
-                    <Grid item xs={12}>
+                    <Grid size={12}>
                       <Typography variant="subtitle2" gutterBottom>リスク管理</Typography>
                       <Grid container spacing={2}>
-                        <Grid item xs={12} md={6}>
+                        <Grid size={{ xs: 12, md: 6 }}>
                           <Typography gutterBottom>ストップロス: {formData.parameters.stopLossPercent}%</Typography>
                           <Slider
                             value={formData.parameters.stopLossPercent}
@@ -414,7 +496,7 @@ export function BacktestForm({ onResult, onOptimizationResult, onComprehensiveRe
                             disabled={isLoading}
                           />
                         </Grid>
-                        <Grid item xs={12} md={6}>
+                        <Grid size={{ xs: 12, md: 6 }}>
                           <Typography gutterBottom>テイクプロフィット: {formData.parameters.takeProfitPercent}%</Typography>
                           <Slider
                             value={formData.parameters.takeProfitPercent}
@@ -472,6 +554,18 @@ export function BacktestForm({ onResult, onOptimizationResult, onComprehensiveRe
           </Box>
         </CardContent>
       </Card>
+
+      {/* 進捗ダイアログ */}
+      <BacktestProgressDialog
+        isOpen={showProgressDialog}
+        onClose={() => {
+          setShowProgressDialog(false)
+          setCurrentTestId(null)
+        }}
+        progress={progress}
+        isLoading={progressLoading}
+        error={progressError}
+      />
     </div>
   )
 }
