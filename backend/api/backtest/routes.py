@@ -22,6 +22,7 @@ from .validators import (
     validate_optimization_request,
     get_available_instruments
 )
+from utils.backtest_period_calculator import BacktestPeriodCalculator
 from core.error_logger import (
     log_backtest_start, log_backtest_complete, log_backtest_error,
     get_recent_error_logs, get_recent_backtest_logs
@@ -303,6 +304,44 @@ async def get_instruments():
         }
     except Exception as e:
         logger.error(f"Error getting instruments: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/calculate-optimal-period")
+async def calculate_optimal_period(request: dict):
+    """Calculate optimal backtest period for given timeframes"""
+    try:
+        timeframes = request.get('timeframes', [])
+        if not timeframes:
+            raise HTTPException(status_code=400, detail="timeframes parameter is required")
+        
+        # 期間計算
+        period_info = BacktestPeriodCalculator.calculate_optimal_period(timeframes)
+        
+        # 期間説明の生成
+        explanation = BacktestPeriodCalculator.get_period_explanation(period_info)
+        
+        # ユーザー指定期間がある場合の検証
+        requested_period = request.get('requested_period_months')
+        validation_result = None
+        if requested_period:
+            validation_result = BacktestPeriodCalculator.validate_period(timeframes, requested_period)
+        
+        return {
+            "status": "success",
+            "data": {
+                "optimal_period_info": period_info,
+                "explanation": explanation,
+                "validation_result": validation_result,
+                "timeframes_analysis": {
+                    tf: BacktestPeriodCalculator.TIMEFRAME_RECOMMENDATIONS.get(tf, {
+                        'recommended_months': 6,
+                        'reason': '不明な時間軸（H1として処理）'
+                    }) for tf in timeframes
+                }
+            }
+        }
+    except Exception as e:
+        logger.error(f"Error calculating optimal period: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/run")

@@ -1,14 +1,15 @@
 """
 バックテストAPIのバリデーション処理
 """
-from datetime import datetime
-from typing import Dict, Any, Optional
+from datetime import datetime, timedelta
+from typing import Dict, Any, Optional, List
 from fastapi import HTTPException
 import logging
 from config.trading_pairs import (
     ALL_INSTRUMENTS, TIMEFRAMES, 
     is_valid_pair, is_valid_timeframe
 )
+from utils.backtest_period_calculator import BacktestPeriodCalculator
 
 logger = logging.getLogger(__name__)
 
@@ -96,7 +97,7 @@ def validate_backtest_request(request: Dict[str, Any]) -> Dict[str, Any]:
     return validated
 
 def validate_comprehensive_request(request: Dict[str, Any]) -> Dict[str, Any]:
-    """包括的バックテストリクエストのバリデーション"""
+    """包括的バックテストリクエストのバリデーション（自動期間計算対応）"""
     logger.info(f"[COMPREHENSIVE VALIDATOR] Received request: {request}")
     from config.trading_pairs import DEFAULT_PAIRS, DEFAULT_TIMEFRAMES
     
@@ -111,11 +112,37 @@ def validate_comprehensive_request(request: Dict[str, Any]) -> Dict[str, Any]:
         # デフォルト: 全時間軸
         timeframes = ['M1', 'M5', 'M15', 'M30', 'H1', 'H4', 'D1']
     
-    # デフォルト日付の設定（過去1年間）
+    # 期間の自動計算
+    auto_optimize_period = request.get('auto_optimize_period', True)
+    test_period_months = request.get('test_period_months')
+    
+    if auto_optimize_period and test_period_months is None:
+        # 自動期間計算
+        period_info = BacktestPeriodCalculator.calculate_optimal_period(timeframes)
+        test_period_months = period_info['recommended_months']
+        logger.info(f"Auto-calculated optimal period: {test_period_months} months")
+        logger.info(f"Period optimization strategy: {period_info['optimization_strategy']}")
+        logger.info(f"Period explanation: {BacktestPeriodCalculator.get_period_explanation(period_info)}")
+    elif test_period_months is None:
+        # 手動設定でも未指定の場合はデフォルト
+        test_period_months = 12
+        logger.info("Using default period: 12 months")
+    
+    # 期間の妥当性検証
+    if auto_optimize_period:
+        validation_result = BacktestPeriodCalculator.validate_period(timeframes, test_period_months)
+        if validation_result['warnings']:
+            for warning in validation_result['warnings']:
+                logger.warning(f"Period validation warning: {warning}")
+        if validation_result['recommendations']:
+            for recommendation in validation_result['recommendations']:
+                logger.info(f"Period recommendation: {recommendation}")
+    
+    # デフォルト日付の設定（計算された期間を使用）
     from datetime import datetime, timedelta
     
     default_end_date = datetime.now()
-    default_start_date = default_end_date - timedelta(days=365)
+    default_start_date = default_end_date - timedelta(days=test_period_months * 30)
     
     # 基本バリデーション（単一銘柄用）
     base_request = {
@@ -174,11 +201,20 @@ def validate_comprehensive_request(request: Dict[str, Any]) -> Dict[str, Any]:
                 detail=f"Invalid risk level: {risk}. Must be between 0.001 and 0.5"
             )
     
+    # 期間情報の詳細計算
+    period_info = BacktestPeriodCalculator.calculate_optimal_period(timeframes)
+    validation_result = BacktestPeriodCalculator.validate_period(timeframes, test_period_months)
+    
     validated.update({
         'symbols': symbols,
         'timeframes': timeframes,
         'use_ml': request.get('use_ml', False),
-        'risk_levels': risk_levels
+        'risk_levels': risk_levels,
+        'test_period_months': test_period_months,
+        'auto_optimize_period': auto_optimize_period,
+        'period_info': period_info,
+        'period_validation': validation_result,
+        'period_explanation': BacktestPeriodCalculator.get_period_explanation(period_info)
     })
     
     return validated

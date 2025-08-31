@@ -92,7 +92,8 @@ class ComprehensiveBacktestRequest(BaseModel):
     """包括的バックテストリクエスト"""
     symbols: Optional[List[SymbolEnum]] = None
     timeframes: Optional[List[TimeframeEnum]] = None
-    test_period_months: int = Field(default=12, gt=0, le=60, description="テスト期間（月）")
+    test_period_months: Optional[int] = Field(default=None, gt=0, le=60, description="テスト期間（月）- 未指定時は自動計算")
+    auto_optimize_period: bool = Field(default=True, description="期間の自動最適化を有効化")
     parameter_ranges: Optional[Dict[str, Union[ParameterRange, List[Any], Any]]] = None
     optimization_metric: OptimizationMetricEnum = OptimizationMetricEnum.SHARPE_RATIO
     initial_balance: float = Field(default=100000, gt=0, description="初期残高")
