@@ -66,14 +66,20 @@ export function usePositions() {
  * 取引状態取得フック
  */
 export function useTradingStatus() {
-  const { setTradingStatus } = useTradingActions()
+  const { setTradingStatus, setConnected } = useTradingActions()
   
   return useQuery({
     queryKey: ['trading-status'],
     queryFn: async () => {
-      const status = await tradingApi.getStatus()
-      setTradingStatus(status) // ストアも更新
-      return status
+      try {
+        const status = await tradingApi.getStatus()
+        setTradingStatus(status) // ストアも更新
+        setConnected(true) // API応答があれば接続中とみなす
+        return status
+      } catch (error) {
+        setConnected(false) // API応答エラーは接続エラーとみなす
+        throw error
+      }
     },
     refetchInterval: REFRESH_INTERVALS.status,
     staleTime: 5000, // 5秒間はキャッシュを使用

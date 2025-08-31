@@ -7,10 +7,10 @@ from typing import Dict, List, Optional, Any
 import logging
 from datetime import datetime
 
-from backend.core.database import DatabaseManager
-from backend.core.mt5_client import MT5Client
-from backend.core.trading_engine import TradingEngine
-from backend.core.risk_manager import RiskManager
+from core.database import DatabaseManager
+from core.mt5_client import MT5Client
+from core.trading_engine import TradingEngine
+from core.risk_manager import RiskManager
 
 logger = logging.getLogger(__name__)
 
@@ -239,6 +239,31 @@ async def get_current_positions():
         logger.error(f"Error getting positions: {e}")
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
+@router.get("/trades")
+async def get_trades(limit: int = 20, offset: int = 0):
+    """
+    取引履歴取得
+    
+    Args:
+        limit: 取得件数（デフォルト20件）
+        offset: オフセット
+        
+    Returns:
+        取引履歴一覧
+    """
+    try:
+        # 現在はモックデータを返す（実際の取引履歴機能は後で実装）
+        return {
+            "status": "success",
+            "data": [],  # 空の配列を返す
+            "count": 0,
+            "timestamp": datetime.now().isoformat()
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting trades: {e}")
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
 @router.get("/orders")
 async def get_current_orders():
     """
@@ -438,4 +463,81 @@ async def close_all_positions():
         
     except Exception as e:
         logger.error(f"Error closing all positions: {e}")
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
+@router.get("/trades")
+async def get_trades(
+    limit: int = 20,
+    offset: int = 0,
+    symbol: str = None,
+    start_date: str = None,
+    end_date: str = None
+):
+    """
+    取引履歴取得
+    
+    Args:
+        limit: 取得件数
+        offset: 開始位置
+        symbol: 通貨ペア（オプション）
+        start_date: 開始日（オプション）
+        end_date: 終了日（オプション）
+    
+    Returns:
+        取引履歴一覧
+    """
+    try:
+        db_manager = DatabaseManager()
+        
+        # パラメータに基づいて取引履歴を取得
+        if symbol or start_date or end_date:
+            # フィルタリング付きクエリ（実装予定）
+            trades = []  # プレースホルダー
+        else:
+            # 基本的なクエリ
+            trades = []  # プレースホルダー
+        
+        return {
+            "status": "success",
+            "data": trades,
+            "count": len(trades),
+            "limit": limit,
+            "offset": offset,
+            "timestamp": datetime.now().isoformat()
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting trades: {e}")
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
+@router.get("/trades/{trade_id}")
+async def get_trade_by_id(trade_id: str):
+    """
+    取引詳細取得
+    
+    Args:
+        trade_id: 取引ID
+    
+    Returns:
+        取引詳細
+    """
+    try:
+        db_manager = DatabaseManager()
+        
+        # 取引詳細を取得（実装予定）
+        trade = None  # プレースホルダー
+        
+        if not trade:
+            raise HTTPException(status_code=404, detail="Trade not found")
+        
+        return {
+            "status": "success",
+            "data": trade,
+            "timestamp": datetime.now().isoformat()
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting trade {trade_id}: {e}")
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")

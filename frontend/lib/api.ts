@@ -137,13 +137,13 @@ export const tradingApi = {
     startDate?: string
     endDate?: string
   }): Promise<Trade[]> => {
-    const response = await api.get<ApiResponse<Trade[]>>('/trades', { params })
+    const response = await api.get<ApiResponse<Trade[]>>('/trading/trades', { params })
     return handleApiResponse(response)
   },
 
   // 個別取引取得
   getTrade: async (tradeId: string): Promise<Trade> => {
-    const response = await api.get<ApiResponse<Trade>>(`/trades/${tradeId}`)
+    const response = await api.get<ApiResponse<Trade>>(`/trading/trades/${tradeId}`)
     return handleApiResponse(response)
   }
 }

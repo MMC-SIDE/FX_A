@@ -3,13 +3,14 @@
  */
 'use client'
 
-import React from 'react'
+import React, { useEffect, useState } from 'react'
 import {
   Box,
   Grid,
   Typography,
   Paper,
-  Container
+  Container,
+  Alert
 } from '@mui/material'
 import Header from '@/components/layout/Header'
 import Sidebar from '@/components/layout/Sidebar'
@@ -29,6 +30,35 @@ export default function DashboardPage() {
     totalPositions, 
     tradingStatus 
   } = useTradingSelectors()
+  const [accountInfo, setAccountInfo] = useState<any>(null)
+  const [accountError, setAccountError] = useState<string | null>(null)
+
+  useEffect(() => {
+    // MT5口座情報を取得
+    const fetchAccountInfo = async () => {
+      try {
+        const response = await fetch('http://localhost:8000/mt5/account')
+        if (response.ok) {
+          const data = await response.json()
+          if (data.success) {
+            setAccountInfo(data.account_info)
+            setAccountError(null)
+          } else {
+            setAccountError('口座情報の取得に失敗しました')
+          }
+        } else {
+          setAccountError('サーバーへの接続に失敗しました')
+        }
+      } catch (error) {
+        setAccountError('口座情報の取得中にエラーが発生しました')
+      }
+    }
+
+    fetchAccountInfo()
+    const interval = setInterval(fetchAccountInfo, 5000) // 5秒ごとに更新
+
+    return () => clearInterval(interval)
+  }, [])
   
   const { data: trades, isLoading: tradesLoading } = useTrades({ limit: 20 })
   const { data: positions, isLoading: positionsLoading } = usePositions()
@@ -94,12 +124,45 @@ export default function DashboardPage() {
             </Typography>
           </Box>
 
+          {/* MT5口座情報 */}
+          {accountError && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {accountError}
+            </Alert>
+          )}
+          
+          {accountInfo && (
+            <Paper sx={{ p: 2, mb: 3 }}>
+              <Typography variant="h6" color="primary" gutterBottom>
+                MT5口座情報
+              </Typography>
+              <Grid container spacing={2}>
+                <Grid size={{ xs: 6, sm: 3 }}>
+                  <Typography variant="body2" color="text.secondary">口座番号</Typography>
+                  <Typography variant="h6">{accountInfo.login}</Typography>
+                </Grid>
+                <Grid size={{ xs: 6, sm: 3 }}>
+                  <Typography variant="body2" color="text.secondary">残高</Typography>
+                  <Typography variant="h6">{formatCurrency(accountInfo.balance)}</Typography>
+                </Grid>
+                <Grid size={{ xs: 6, sm: 3 }}>
+                  <Typography variant="body2" color="text.secondary">有効証拠金</Typography>
+                  <Typography variant="h6">{formatCurrency(accountInfo.equity)}</Typography>
+                </Grid>
+                <Grid size={{ xs: 6, sm: 3 }}>
+                  <Typography variant="body2" color="text.secondary">余剰証拠金</Typography>
+                  <Typography variant="h6">{formatCurrency(accountInfo.margin_free)}</Typography>
+                </Grid>
+              </Grid>
+            </Paper>
+          )}
+
           <Grid container spacing={3}>
             {/* サマリーカード */}
-            <Grid item xs={12}>
+            <Grid size={12}>
               <Grid container spacing={2}>
                 {/* 取引状態 */}
-                <Grid item xs={12} sm={6} md={3}>
+                <Grid size={{ xs: 12, sm: 6, md: 3 }}>
                   <Paper sx={{ p: 2, textAlign: 'center' }}>
                     <Typography variant="h6" color="primary" gutterBottom>
                       取引状態
@@ -114,7 +177,7 @@ export default function DashboardPage() {
                 </Grid>
 
                 {/* 保有ポジション */}
-                <Grid item xs={12} sm={6} md={3}>
+                <Grid size={{ xs: 12, sm: 6, md: 3 }}>
                   <Paper sx={{ p: 2, textAlign: 'center' }}>
                     <Typography variant="h6" color="primary" gutterBottom>
                       保有ポジション
@@ -129,7 +192,7 @@ export default function DashboardPage() {
                 </Grid>
 
                 {/* 評価損益 */}
-                <Grid item xs={12} sm={6} md={3}>
+                <Grid size={{ xs: 12, sm: 6, md: 3 }}>
                   <Paper sx={{ p: 2, textAlign: 'center' }}>
                     <Typography variant="h6" color="primary" gutterBottom>
                       評価損益
@@ -148,7 +211,7 @@ export default function DashboardPage() {
                 </Grid>
 
                 {/* 本日の損益 */}
-                <Grid item xs={12} sm={6} md={3}>
+                <Grid size={{ xs: 12, sm: 6, md: 3 }}>
                   <Paper sx={{ p: 2, textAlign: 'center' }}>
                     <Typography variant="h6" color="primary" gutterBottom>
                       本日の損益
@@ -169,12 +232,12 @@ export default function DashboardPage() {
             </Grid>
 
             {/* 取引制御パネル */}
-            <Grid item xs={12} md={4}>
+            <Grid size={{ xs: 12, md: 4 }}>
               <TradingPanel />
             </Grid>
 
             {/* アカウント情報 */}
-            <Grid item xs={12} md={8}>
+            <Grid size={{ xs: 12, md: 8 }}>
               <Paper sx={{ p: 3 }}>
                 <Typography variant="h6" gutterBottom>
                   アカウント情報
@@ -182,7 +245,7 @@ export default function DashboardPage() {
                 
                 {tradingStatus ? (
                   <Grid container spacing={2}>
-                    <Grid item xs={12} sm={6}>
+                    <Grid size={12} sm={6}>
                       <Box>
                         <Typography variant="caption" color="text.secondary">
                           口座残高
@@ -193,7 +256,7 @@ export default function DashboardPage() {
                       </Box>
                     </Grid>
                     
-                    <Grid item xs={12} sm={6}>
+                    <Grid size={12} sm={6}>
                       <Box>
                         <Typography variant="caption" color="text.secondary">
                           有効証拠金
@@ -204,7 +267,7 @@ export default function DashboardPage() {
                       </Box>
                     </Grid>
                     
-                    <Grid item xs={12} sm={6}>
+                    <Grid size={12} sm={6}>
                       <Box>
                         <Typography variant="caption" color="text.secondary">
                           余剰証拠金
@@ -215,7 +278,7 @@ export default function DashboardPage() {
                       </Box>
                     </Grid>
                     
-                    <Grid item xs={12} sm={6}>
+                    <Grid size={12} sm={6}>
                       <Box>
                         <Typography variant="caption" color="text.secondary">
                           証拠金維持率
@@ -243,7 +306,7 @@ export default function DashboardPage() {
             </Grid>
 
             {/* ポジション一覧 */}
-            <Grid item xs={12}>
+            <Grid size={12}>
               <Paper sx={{ p: 3 }}>
                 <Typography variant="h6" gutterBottom>
                   保有ポジション
@@ -256,7 +319,7 @@ export default function DashboardPage() {
             </Grid>
 
             {/* 最近の取引 */}
-            <Grid item xs={12}>
+            <Grid size={12}>
               <Paper sx={{ p: 3 }}>
                 <Typography variant="h6" gutterBottom>
                   最近の取引履歴
