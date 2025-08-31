@@ -8,8 +8,8 @@ from typing import Dict, List, Optional, Any, Tuple
 from datetime import datetime, timedelta
 import json
 
-from backend.core.database import DatabaseManager
-from backend.core.mt5_client import MT5Client
+from core.database import DatabaseManager
+from core.mt5_client import MT5Client
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +24,25 @@ class RiskManager:
         
     def _load_risk_settings(self) -> Dict[str, Any]:
         """リスク設定を読み込み"""
+        # デフォルト値を設定
+        default_settings = {
+            'max_risk_per_trade': 0.02,  # 2%
+            'max_drawdown': 0.20,        # 20%
+            'use_nanpin': True,
+            'nanpin_max_count': 3,
+            'nanpin_interval_pips': 10,
+            'max_positions': 5,
+            'max_daily_trades': 20,
+            'stop_loss_pips': 50,
+            'take_profit_pips': 100,
+            'trailing_stop_pips': 30,
+            'min_confidence_score': 0.7,
+            'max_consecutive_losses': 5,
+            'daily_loss_limit': 0.05    # 5%
+        }
+        
         try:
+            # データベースから設定を読み込む
             with self.db_manager.get_connection() as conn:
                 query = """
                     SELECT key, value, value_type FROM system_settings 
@@ -49,23 +67,7 @@ class RiskManager:
                     else:
                         settings[key] = value
                 
-                # デフォルト値を設定
-                default_settings = {
-                    'max_risk_per_trade': 0.02,  # 2%
-                    'max_drawdown': 0.20,        # 20%
-                    'use_nanpin': True,
-                    'nanpin_max_count': 3,
-                    'nanpin_interval_pips': 10,
-                    'max_positions': 5,
-                    'max_daily_trades': 20,
-                    'stop_loss_pips': 50,
-                    'take_profit_pips': 100,
-                    'trailing_stop_pips': 30,
-                    'min_confidence_score': 0.7,
-                    'max_consecutive_losses': 5,
-                    'daily_loss_limit': 0.05    # 5%
-                }
-                
+                # デフォルト値で補完
                 for key, default_value in default_settings.items():
                     if key not in settings:
                         settings[key] = default_value
@@ -75,21 +77,7 @@ class RiskManager:
         except Exception as e:
             logger.error(f"Error loading risk settings: {e}")
             # エラー時はデフォルト設定を返す
-            return {
-                'max_risk_per_trade': 0.02,
-                'max_drawdown': 0.20,
-                'use_nanpin': True,
-                'nanpin_max_count': 3,
-                'nanpin_interval_pips': 10,
-                'max_positions': 5,
-                'max_daily_trades': 20,
-                'stop_loss_pips': 50,
-                'take_profit_pips': 100,
-                'trailing_stop_pips': 30,
-                'min_confidence_score': 0.7,
-                'max_consecutive_losses': 5,
-                'daily_loss_limit': 0.05
-            }
+            return default_settings
     
     def check_risk_limits(self) -> bool:
         """
